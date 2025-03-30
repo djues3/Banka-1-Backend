@@ -1,12 +1,14 @@
 package types
 
 type Actuary struct {
-	ID           uint    `gorm:"primaryKey"`
-	UserID       uint    `gorm:"uniqueIndex;not null"`
-	Role         string  `gorm:"type:text;not null"`
-	LimitAmount  float64 `gorm:"default:null"`  // Samo za agente
-	UsedLimit    float64 `gorm:"default:0"`     // Samo za agente, resetuje se dnevno
-	NeedApproval bool    `gorm:"default:false"` // Da li orderi agenta trebaju supervizorsko odobrenje
+	ID           uint    `gorm:"primaryKey" json:"id,omitempty"`
+	UserID       uint    `gorm:"uniqueIndex;not null" json:"userId"`
+	Role         string  `gorm:"type:text;not null" json:"role,omitempty"`
+	FullName     string  `gorm:"not null" json:"fullName"`
+	Email        string  `gorm:"not null" json:"email"`
+	LimitAmount  float64 `gorm:"default:null" json:"limit"`         // Samo za agente
+	UsedLimit    float64 `gorm:"default:0" json:"usedLimit"`        // Samo za agente, resetuje se dnevno
+	NeedApproval bool    `gorm:"default:false" json:"needApproval"` // Da li orderi agenta trebaju supervizorsko odobrenje
 }
 
 type Security struct {

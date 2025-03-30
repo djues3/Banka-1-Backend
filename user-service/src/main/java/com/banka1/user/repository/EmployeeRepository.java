@@ -3,6 +3,7 @@ package com.banka1.user.repository;
 import com.banka1.common.model.Department;
 import com.banka1.user.model.Employee;
 
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -13,5 +14,10 @@ public interface EmployeeRepository extends UserRepository<Employee> {
 
     List<Employee> findByDepartment(Department department);
 
+    boolean existsByEmail(String email);
+
     boolean existsById(@NonNull Long id);
+
+    @Query("SELECT e FROM Employee e WHERE e.department = 'AGENT'")
+    List<Employee> getActuaries();
 }

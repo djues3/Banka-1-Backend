@@ -1,6 +1,7 @@
 package main
 
 import (
+	"banka1.com/cron"
 	"os"
 	"time"
 
@@ -32,7 +33,7 @@ func main() {
 	}
 
 	db.Init()
-	db.StartScheduler()
+	cron.StartScheduler()
 
 	err = exchanges.LoadDefaultExchanges()
 	if err != nil {

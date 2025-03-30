@@ -266,4 +266,12 @@ public class EmployeeController {
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.BAD_REQUEST), false, null, e.getMessage());
         }
     }
+
+    @GetMapping("/actuaries")
+    public ResponseEntity<?> fetchActuaries(){
+      var employees = employeeService.getAllActuaries();
+      return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK), true, employees, null);
+    }
+
+
 }

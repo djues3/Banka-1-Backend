@@ -17,6 +17,8 @@ import org.springframework.jms.core.JmsTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
@@ -202,5 +204,13 @@ public class EmployeeService {
                 employeePage.getTotalElements(),
                 employeePage.stream().map(EmployeeService::getEmployeeResponse).toList()
         );
+    }
+
+    public List<EmployeeResponse> getAllActuaries(){
+        return employeeRepository.getActuaries()
+                        .stream()
+                        .map(EmployeeService::getEmployeeResponse)
+                        .toList();
+
     }
 }

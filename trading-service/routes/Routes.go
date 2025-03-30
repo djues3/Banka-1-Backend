@@ -13,7 +13,9 @@ func Setup(app *fiber.App) {
 
 	app.Get("/actuaries/all", actuaryController.GetAllActuaries)
 
-	app.Put("actuaries/:ID", actuaryController.ChangeAgentLimits)
+	app.Put("/actuaries/:ID/reset-used-limit", actuaryController.ResetActuaryLimit)
+
+	app.Put("actuaries/:ID/limit", actuaryController.ChangeAgentLimits)
 
 	app.Get("/actuaries/filter", actuaryController.FilterActuaries)
 }
