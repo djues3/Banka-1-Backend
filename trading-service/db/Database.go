@@ -92,3 +92,12 @@ func migrate(db *gorm.DB) {
 		&types.Option{},
 	)
 }
+
+func InitTestDatabase() error {
+	var err error
+	DB, err = gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+	return DB.AutoMigrate(&types.Security{}, &types.Order{}, &types.Actuary{}, &types.Transaction{}, &types.Portfolio{})
+}
