@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// MatchOrder se poziva kada je order odobren i spreman za izvršavanje
 func MatchOrder(order types.Order) {
 	go func() {
 		if order.AON {
@@ -35,7 +34,6 @@ func MatchOrder(order types.Order) {
 				order.Status = "done"
 			}
 
-			// Obavezno eksplicitno ažuriraj u bazi
 			db.DB.Model(&types.Order{}).Where("id = ?", order.ID).Updates(map[string]interface{}{
 				"remaining_parts": *order.RemainingParts,
 				"is_done":         order.IsDone,
@@ -49,22 +47,18 @@ func MatchOrder(order types.Order) {
 }
 
 func getOrderPrice(order types.Order) float64 {
-	// Market order koristi tržišnu cenu
 	if order.OrderType == "MARKET" {
 		var security types.Security
 		db.DB.First(&security, order.SecurityID)
 		return security.LastPrice
 	}
-	// Limit ili Stop-Limit
 	if order.LimitPricePerUnit != nil {
 		return *order.LimitPricePerUnit
 	}
-	// Fallback
 	return 0.0
 }
 
 func executePartial(order types.Order, quantity int, price float64) {
-	// Pronađi matching order (npr. suprotnog smera, za istu hartiju)
 	var match types.Order
 	direction := "buy"
 	if order.Direction == "buy" {
@@ -81,12 +75,34 @@ func executePartial(order types.Order, quantity int, price float64) {
 		return
 	}
 
+	if match.AON && (match.RemainingParts == nil || *match.RemainingParts < quantity) {
+		fmt.Println("Matchovani order je AON i ne može da se izvrši u celosti")
+		return
+	}
+
+	if match.Margin {
+		var actuary types.Actuary
+		if err := db.DB.Where("user_id = ?", match.UserID).First(&actuary).Error; err != nil || actuary.Role != "agent" {
+			fmt.Println("Matchovani margin order nema validnog aktuara")
+			return
+		}
+		initialMargin := price * float64(quantity) * 0.3 * 1.1
+		if actuary.LimitAmount-actuary.UsedLimit < initialMargin {
+			fmt.Println("Matchovani margin order nema dovoljno limita")
+			return
+		}
+	}
+
+	if match.UserID == order.UserID {
+		fmt.Println("Preskočen self-match")
+		return
+	}
+
 	matchQuantity := quantity
 	if match.RemainingParts != nil && *match.RemainingParts < quantity {
 		matchQuantity = *match.RemainingParts
 	}
 
-	// Kreiraj transakciju
 	txn := types.Transaction{
 		OrderID:      order.ID,
 		BuyerID:      getBuyerID(order, match),
@@ -98,7 +114,6 @@ func executePartial(order types.Order, quantity int, price float64) {
 	}
 	db.DB.Create(&txn)
 
-	// Ažuriraj RemainingParts za oba ordera
 	*order.RemainingParts -= matchQuantity
 	*match.RemainingParts -= matchQuantity
 	if *match.RemainingParts == 0 {
@@ -108,11 +123,9 @@ func executePartial(order types.Order, quantity int, price float64) {
 	db.DB.Save(&order)
 	db.DB.Save(&match)
 
-	// Ažuriraj portfolio kupca i prodavca
 	updatePortfolio(getBuyerID(order, match), order.SecurityID, matchQuantity)
 	updatePortfolio(getSellerID(order, match), order.SecurityID, -matchQuantity)
 
-	// Ako je margin order, ažuriraj iskorišćenje limita
 	if order.Margin {
 		var actuary types.Actuary
 		if err := db.DB.Where("user_id = ?", order.UserID).First(&actuary).Error; err == nil {
@@ -129,13 +142,12 @@ func updatePortfolio(userID uint, securityID uint, delta int) {
 	var portfolio types.Portfolio
 	err := db.DB.Where("user_id = ? AND security_id = ?", userID, securityID).First(&portfolio).Error
 	if err != nil {
-		// Ako ne postoji unos, kreiraj ga ako je delta > 0
 		if delta > 0 {
 			portfolio = types.Portfolio{
 				UserID:        userID,
 				SecurityID:    securityID,
 				Quantity:      delta,
-				PurchasePrice: 0, // Može se dodatno obraditi
+				PurchasePrice: 0,
 			}
 			db.DB.Create(&portfolio)
 		}
@@ -151,16 +163,14 @@ func updatePortfolio(userID uint, securityID uint, delta int) {
 }
 
 func calculateDelay(order types.Order) time.Duration {
-	// Random vreme izvršavanja u sekundama
 	delaySeconds := rand.Intn(10) + 1
 	if order.AfterHours {
-		return time.Duration(delaySeconds+1800) * time.Second // +30min delay
+		return time.Duration(delaySeconds+1800) * time.Second
 	}
 	return time.Duration(delaySeconds) * time.Second
 }
 
 func canExecuteAll(order types.Order) bool {
-	// Prava logika: broj dostupnih suprotnih ordera koji mogu da zadovolje celu količinu
 	var matchingOrders []types.Order
 	direction := "buy"
 	if order.Direction == "buy" {
@@ -169,7 +179,6 @@ func canExecuteAll(order types.Order) bool {
 		direction = "buy"
 	}
 
-	// Pronađi sve odobrene, neizvršene suprotne ordere za istu hartiju
 	db.DB.Where("security_id = ? AND direction = ? AND status = ? AND is_done = ?", order.SecurityID, direction, "approved", false).Find(&matchingOrders)
 
 	totalAvailable := 0

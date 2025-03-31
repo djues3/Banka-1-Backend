@@ -65,7 +65,7 @@ func Test_MatchOrder_SimpleMarket(t *testing.T) {
 	_ = seller
 
 	orders.MatchOrder(buyer)
-	time.Sleep(1 * time.Second) // da gorutina krene
+	time.Sleep(1 * time.Second)
 
 	if !waitForOrderCompletion(buyer.ID, 30) {
 		t.Errorf("Order nije završen u zadatom vremenu")
@@ -109,5 +109,56 @@ func Test_MatchOrder_MarginOrder(t *testing.T) {
 	db.DB.Where("user_id = ?", actuary.UserID).First(&actuary)
 	if actuary.UsedLimit <= 0 {
 		t.Errorf("UsedLimit nije ažuriran za margin order")
+	}
+}
+
+func Test_MatchOrder_AONMatchFails(t *testing.T) {
+	security := types.Security{Name: "FailMatch", Ticker: "FAIL", LastPrice: 120.0, Exchange: "NYSE", Type: "stock"}
+	db.DB.Create(&security)
+
+	seller := createTestOrder(401, "sell", 5, security.ID, false, true)
+	buyer := createTestOrder(402, "buy", 2, security.ID, false, false)
+	_ = seller
+
+	orders.MatchOrder(buyer)
+	time.Sleep(2 * time.Second)
+	db.DB.First(&seller, seller.ID)
+
+	if seller.IsDone {
+		t.Errorf("AON matchovani order je izvršen iako nije trebalo")
+	}
+}
+
+func Test_MatchOrder_MarginMatchFails(t *testing.T) {
+	security := types.Security{Name: "BadMargin", Ticker: "BM", LastPrice: 500.0, Exchange: "NYSE", Type: "stock"}
+	db.DB.Create(&security)
+
+	seller := createTestOrder(501, "sell", 2, security.ID, true, false)
+	buyer := createTestOrder(502, "buy", 2, security.ID, false, false)
+	_ = buyer
+
+	orders.MatchOrder(buyer)
+	time.Sleep(2 * time.Second)
+	db.DB.First(&seller, seller.ID)
+
+	if seller.IsDone {
+		t.Errorf("Margin matchovani order je izvršen iako nije trebalo")
+	}
+}
+
+func Test_MatchOrder_SelfMatchPrevented(t *testing.T) {
+	security := types.Security{Name: "SelfStock", Ticker: "SELF", LastPrice: 100.0, Exchange: "NYSE", Type: "stock"}
+	db.DB.Create(&security)
+
+	order1 := createTestOrder(601, "buy", 1, security.ID, false, false)
+	order2 := createTestOrder(601, "sell", 1, security.ID, false, false)
+	_ = order2
+
+	orders.MatchOrder(order1)
+	time.Sleep(2 * time.Second)
+	db.DB.First(&order1, order1.ID)
+
+	if order1.IsDone {
+		t.Errorf("Self-match je prošao iako ne bi trebalo")
 	}
 }
