@@ -9,6 +9,8 @@ func Setup(app *fiber.App) {
 
 	actuaryController := controllers.NewActuaryController()
 
+	portfolioController := controllers.NewPortfolioController()
+
 	app.Post("/actuaries", actuaryController.CreateActuary)
 
 	app.Get("/actuaries/all", actuaryController.GetAllActuaries)
@@ -18,4 +20,6 @@ func Setup(app *fiber.App) {
 	app.Put("actuaries/:ID/limit", actuaryController.ChangeAgentLimits)
 
 	app.Get("/actuaries/filter", actuaryController.FilterActuaries)
+
+	app.Get("/securities/:id", portfolioController.GetUserSecurities)
 }

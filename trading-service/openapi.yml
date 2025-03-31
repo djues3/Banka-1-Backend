@@ -387,3 +387,55 @@ paths:
                   message:
                     type: string
                     example: "Order updated successfully"
+
+  /securities/{id}:
+    get:
+      summary: Lista hartija koje korisnik poseduje
+      operationId: getUserSecurities
+      tags:
+        - Hartije od vrednosti
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista hartija u vlasništvu korisnika
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ticker:
+                          type: string
+                        type:
+                          type: string
+                        amount:
+                          type: integer
+                        price:
+                          type: number
+                        profit:
+                          type: number
+                        lastModified:
+                          type: integer
+                  error:
+                    type: string
+              example:
+                success: true
+                data:
+                  - ticker: "AAPL"
+                    type: "stock"
+                    amount: 5
+                    price: 150.5
+                    profit: 100.0
+                    lastModified: 1711822400
+                error: ""
