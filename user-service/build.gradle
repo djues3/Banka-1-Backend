@@ -102,7 +102,7 @@ jacocoTestCoverageVerification {
     }
 }
 
-tasks.named('test') {
+tasks.named('test', Test) {
     useJUnitPlatform()
     systemProperty "cucumber.execution.parallel.enabled", "false"
     finalizedBy jacocoTestReport

@@ -146,7 +146,7 @@ public class SearchIntegrationTest {
 
     @Test
     void testCustomer() {
-        String id = "1";
+        String id = "101";
 
         var token = loginAsAdmin();
 
