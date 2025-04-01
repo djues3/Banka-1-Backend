@@ -18,6 +18,7 @@ import (
 	"banka1.com/listings/forex"
 	"banka1.com/listings/stocks"
 	"banka1.com/orders"
+	"banka1.com/tax"
 	"banka1.com/types"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
@@ -553,6 +554,7 @@ func main() {
 	app.Get("/actuaries/filter", controllers.NewActuaryController().FilterActuaries)
 
 	orders.InitRoutes(app)
+	tax.InitRoutes(app)
 
 	port := os.Getenv("LISTEN_PATH")
 	log.Fatal(app.Listen(port))

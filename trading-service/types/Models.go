@@ -80,12 +80,12 @@ type Portfolio struct {
 
 type Tax struct {
 	ID            uint    `gorm:"primaryKey"`
-	UserID        uint    `gorm:"not null"`
-	MonthYear     string  `gorm:"not null"` // Format: YYYY-MM
+	UserID        uint    `gorm:"not null;index:idx_tax_user_createdat"`
+	MonthYear     string  `gorm:"not null;index"` // Format: YYYY-MM
 	TaxableProfit float64 `gorm:"not null"`
 	TaxAmount     float64 `gorm:"not null"`
 	IsPaid        bool    `gorm:"default:false"`
-	CreatedAt     int64   `gorm:"autoCreateTime"`
+	CreatedAt     int64   `gorm:"autoCreateTime;index:idx_tax_user_createdat"`
 	User          uint    `gorm:"foreignKey:UserID"`
 }
 
