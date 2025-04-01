@@ -13,42 +13,8 @@ import java.util.List;
 @Entity
 @Getter
 @Setter
-public class Employee {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false)
-    private String firstName;
-
-    @Column(nullable = false)
-    private String lastName;
-
-    @Column(nullable = false)
-    private String birthDate; // Format: "YYYY-MM-DD"
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Gender gender;
-
-    @Column(nullable = false, unique = true)
-    private String email;
-
-    @Column(nullable = false)
-    private String phoneNumber;
-
-    @Column(nullable = false)
-    private String address;
-
-    @Column(nullable = false, unique = true)
-    private String username;
-
-    @Column
-    private String password;
-
-    @Column
-    private String saltPassword;
+@DiscriminatorValue("employee")
+public class Employee  extends User {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -64,11 +30,4 @@ public class Employee {
     @Column(nullable = false)
     private Boolean isAdmin;
 
-    private String verificationCode;
-
-    @ElementCollection(fetch = FetchType.EAGER)
-    @Enumerated(EnumType.STRING)
-    @CollectionTable(name = "employee_permissions", joinColumns = @JoinColumn(name = "employee_id"))
-    @Column(name = "permission")
-    private List<Permission> permissions;
 }

@@ -8,9 +8,11 @@ import com.banka1.user.repository.EmployeeRepository;
 import com.banka1.user.utils.ResponseMessage;
 import com.banka1.common.model.Position;
 import com.banka1.common.service.implementation.GenericAuthService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class AuthService extends GenericAuthService {
     private final CustomerRepository customerRepository;
@@ -31,12 +33,14 @@ public class AuthService extends GenericAuthService {
     public String login(LoginRequest loginRequest) throws IllegalArgumentException {
         String email = loginRequest.getEmail();
         String password = loginRequest.getPassword();
-
+        log.info("Login request for email: {}", email);
         Customer customer = customerRepository.findByEmail(email).orElse(null);
+        log.info("Customer: {}", customer);
         if(customer != null && verifyPassword(password, customer.getPassword(), customer.getSaltPassword()))
             return generateToken(customer.getId(), Position.NONE, customer.getPermissions(), false, false, null);
 
         Employee employee = employeeRepository.findByEmail(email).orElse(null);
+        log.info("Employee: {}", employee);
         if(employee != null && verifyPassword(password, employee.getPassword(), employee.getSaltPassword()) && employee.getActive())
             return generateToken(employee.getId(), employee.getPosition(), employee.getPermissions(), true, employee.getIsAdmin(), employee.getDepartment());
 
