@@ -17,6 +17,7 @@ class UserManager implements UserDetailsService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public User loadUserByUsername(String email) throws UsernameNotFoundException {
         var user = userRepository.findByEmail(email);
         if (user.isEmpty()) {
