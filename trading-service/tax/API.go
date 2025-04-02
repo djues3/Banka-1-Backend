@@ -12,7 +12,8 @@ func GetTaxForAllUsers(c *fiber.Ctx) error {
 SELECT user_id, taxable_profit, tax_amount, is_paid, actuary.id IS NOT NULL
 FROM tax LEFT JOIN actuary USING (user_id)
 WHERE month_year = (SELECT MAX(month_year) FROM tax)
-AND created_at = (SELECT c FROM max_created_at WHERE max_created_at.user_id = tax.user_id);`).Rows()
+AND created_at = (SELECT c FROM max_created_at WHERE max_created_at.user_id = tax.user_id)
+AND NOT is_paid;`).Rows()
 	defer rows.Close()
 	if err != nil {
 		return c.Status(400).JSON(types.Response{
