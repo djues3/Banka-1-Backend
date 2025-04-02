@@ -1,9 +1,10 @@
 package main
 
 import (
-	"banka1.com/cron"
 	"os"
 	"time"
+
+	"banka1.com/cron"
 
 	// options "banka1.com/listings/options"
 	"banka1.com/middlewares"
@@ -377,6 +378,74 @@ func main() {
 			Success: true,
 			Data:    history,
 			Error:   "",
+		})
+	})
+
+	app.Get("/options/ticker/:ticker", func(c *fiber.Ctx) error {
+		var listings []types.Listing
+
+		ticker := c.Params("ticker")
+		if result := db.DB.Preload("Exchange").Where("ticker = ? AND type = ?", ticker, "Option").Find(&listings); result.Error != nil {
+			return c.Status(404).JSON(types.Response{
+				Success: false,
+				Data:    nil,
+				Error:   "Options not found with ticker: " + ticker,
+			})
+		}
+
+		var options []types.Option
+		for _, listing := range listings {
+			var option types.Option
+			if result := db.DB.Preload("Listing.Exchange").Where("listing_id = ?", listing.ID).First(&option); result.Error != nil {
+				return c.Status(500).JSON(types.Response{
+					Success: false,
+					Data:    nil,
+					Error:   "Failed to fetch option details: " + result.Error.Error(),
+				})
+			}
+			options = append(options, option)
+		}
+
+		return c.JSON(types.Response{
+			Success: true,
+			Data: map[string]interface{}{
+				"listing": listings,
+				"details": options,
+			},
+			Error: "",
+		})
+	})
+
+	app.Get("/options/symbol/:symbol", func(c *fiber.Ctx) error {
+		var listings []types.Listing
+		symbol := c.Params("symbol")
+		if result := db.DB.Preload("Exchange").Where("ticker LIKE ? AND type = ?", symbol+"%", "Option").Find(&listings); result.Error != nil {
+			return c.Status(404).JSON(types.Response{
+				Success: false,
+				Data:    nil,
+				Error:   "Options not found with symbol: " + symbol,
+			})
+		}
+
+		var options []types.Option
+		for _, listing := range listings {
+			var option types.Option
+			if result := db.DB.Preload("Listing.Exchange").Where("listing_id = ?", listing.ID).First(&option); result.Error != nil {
+				return c.Status(500).JSON(types.Response{
+					Success: false,
+					Data:    nil,
+					Error:   "Failed to fetch option details: " + result.Error.Error(),
+				})
+			}
+			options = append(options, option)
+		}
+
+		return c.JSON(types.Response{
+			Success: true,
+			Data: map[string]interface{}{
+				"listing": listings,
+				"details": options,
+			},
 		})
 	})
 

@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gofiber/fiber/v2/log"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/gofiber/fiber/v2/log"
 
 	"banka1.com/db"
 	"banka1.com/types"
@@ -222,4 +223,30 @@ func SaveOptionsToDB(ticker string, yahooResp YahooOptionsApiResponse) error {
 		}
 	}
 	return nil
+}
+
+func GetOptionsForTicker(ticker string) ([]types.Option, error) {
+	var options []types.Option
+	if err := db.DB.Where("ticker = ?", ticker).Find(&options).Error; err != nil {
+		return nil, err
+	}
+	return options, nil
+}
+
+func GetOptionsForListingID(listingID uint) ([]types.Option, error) {
+	var options []types.Option
+	if err := db.DB.Where("listing_id = ?", listingID).Find(&options).Error; err != nil {
+		return nil, err
+	}
+
+	return options, nil
+}
+
+func GetOptionsForSymbol(symbol string) ([]types.Option, error) {
+	var options []types.Option
+	if err := db.DB.Where("ticker LIKE ?", symbol+"%").Find(&options).Error; err != nil {
+		return nil, err
+	}
+
+	return options, nil
 }
