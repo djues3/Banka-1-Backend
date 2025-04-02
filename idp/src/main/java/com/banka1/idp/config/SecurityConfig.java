@@ -112,18 +112,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    //    @Bean
-    //    public UserDetailsService userDetailsService() {
-    //        UserDetails userDetails =
-    //                User.withDefaultPasswordEncoder()
-    //                        .username("user")
-    //                        .password("password")
-    //                        .roles("USER")
-    //                        .build();
-    //
-    //        return new InMemoryUserDetailsManager(userDetails);
-    //    }
-
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
         RegisteredClient oidcClient =
