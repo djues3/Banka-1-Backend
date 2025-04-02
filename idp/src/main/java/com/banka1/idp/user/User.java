@@ -17,7 +17,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
-/** Cannot be a JPA entity because of implementing CredentialsContainer. */
+/**
+ * Implements CredentialsContainer which erases the password field.
+ * Care should be taken when managing this entity to avoid unintended
+ * persistence of null passwords after security operations.
+ */
 @Slf4j
 @Entity
 @Table(name = "\"user\"")
