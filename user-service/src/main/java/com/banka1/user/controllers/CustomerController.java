@@ -3,7 +3,6 @@ package com.banka1.user.controllers;
 import com.banka1.user.DTO.request.CreateCustomerRequest;
 import com.banka1.user.DTO.request.UpdateCustomerRequest;
 import com.banka1.user.DTO.request.UpdatePermissionsRequest;
-import com.banka1.user.aspect.Authorization;
 import com.banka1.user.model.Customer;
 import com.banka1.common.model.Permission;
 import com.banka1.user.service.CustomerService;
@@ -80,7 +79,7 @@ public class CustomerController {
         )
     })
     @GetMapping("/{id}")
-    @Authorization(permissions = { Permission.READ_CUSTOMER }, allowIdFallback = true )
+//    @Authorization(permissions = { Permission.READ_CUSTOMER }, allowIdFallback = true )
     public ResponseEntity<?> getById(
             @Parameter(required = true, example = "1")
             @PathVariable String id
@@ -97,7 +96,7 @@ public class CustomerController {
     }
 
     @PostMapping
-    @Authorization(permissions = { Permission.CREATE_CUSTOMER }, allowIdFallback = true )
+//    @Authorization(permissions = { Permission.CREATE_CUSTOMER }, allowIdFallback = true )
     @Operation(summary = "Kreiranje mušterije", description = "Kreira mušteriju i vraća ID kreirane mušterije")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Mušterija uspešno kreirana", content = @Content(mediaType = "application/json",
@@ -150,7 +149,7 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
-    @Authorization(permissions = { Permission.EDIT_CUSTOMER }, allowIdFallback = true )
+//    @Authorization(permissions = { Permission.EDIT_CUSTOMER }, allowIdFallback = true )
     @Operation(summary = "Ažuriranje mušterije")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Podaci korisnika ažurirani", content = @Content(mediaType = "application/json",
@@ -194,7 +193,7 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
-    @Authorization(permissions = { Permission.DELETE_CUSTOMER }, allowIdFallback = true )
+//    @Authorization(permissions = { Permission.DELETE_CUSTOMER }, allowIdFallback = true )
     @Operation(summary = "Brisanje mušterije")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Korisnik uspešno obrisan", content = @Content(mediaType = "application/json",
@@ -236,7 +235,7 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}/permissions")
-    @Authorization(permissions = { Permission.SET_CUSTOMER_PERMISSION }, allowIdFallback = true )
+//    @Authorization(permissions = { Permission.SET_CUSTOMER_PERMISSION }, allowIdFallback = true )
     @Operation(summary = "Ažuriranje permisija mušterije")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Uspesno ažurirane permisije", content = @Content(mediaType = "application/json",

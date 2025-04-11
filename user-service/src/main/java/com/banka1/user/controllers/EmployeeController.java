@@ -3,7 +3,6 @@ package com.banka1.user.controllers;
 import com.banka1.user.DTO.request.CreateEmployeeRequest;
 import com.banka1.user.DTO.request.UpdateEmployeeRequest;
 import com.banka1.user.DTO.request.UpdatePermissionsRequest;
-import com.banka1.user.aspect.Authorization;
 import com.banka1.user.model.Employee;
 import com.banka1.common.model.Permission;
 import com.banka1.common.model.Position;
@@ -74,7 +73,7 @@ public class EmployeeController {
             )
     })
     @GetMapping("/{id}")
-    @Authorization(permissions = { Permission.READ_EMPLOYEE }, allowIdFallback = true )
+//    @Authorization(permissions = { Permission.READ_EMPLOYEE }, allowIdFallback = true )
     public ResponseEntity<?> getById(
             @Parameter(required = true, example = "1")
             @PathVariable String id
@@ -91,7 +90,7 @@ public class EmployeeController {
     }
 
     @PostMapping("/")
-    @Authorization(permissions = { Permission.CREATE_EMPLOYEE }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.CREATE_EMPLOYEE }, positions = { Position.HR })
     @Operation(summary = "Kreiranje zaposlenog", description = "Dodaje novog zaposlenog u sistem.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Zaposleni uspešno kreiran", content = @Content(mediaType = "application/json",
@@ -140,7 +139,7 @@ public class EmployeeController {
 
 
     @PutMapping("/{id}")
-    @Authorization(permissions = { Permission.EDIT_EMPLOYEE }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.EDIT_EMPLOYEE }, positions = { Position.HR })
     @Operation(summary = "Ažuriranje zaposlenog", description = "Menja podatke zaposlenog na osnovu ID-a.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Podaci uspešno ažurirani", content = @Content(mediaType = "application/json",
@@ -180,7 +179,7 @@ public class EmployeeController {
     }
 
     @DeleteMapping("/{id}")
-    @Authorization(permissions = { Permission.DELETE_EMPLOYEE }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.DELETE_EMPLOYEE }, positions = { Position.HR })
     @Operation(summary = "Brisanje zaposlenog", description = "Briše zaposlenog iz sistema po ID-u.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Korisnik uspešno obrisan", content = @Content(mediaType = "application/json",
@@ -223,7 +222,7 @@ public class EmployeeController {
     }
 
     @PutMapping("/{id}/permissions")
-    @Authorization(permissions = { Permission.SET_EMPLOYEE_PERMISSION }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.SET_EMPLOYEE_PERMISSION }, positions = { Position.HR })
     @Operation(summary = "Ažuriranje permisija zaposlenom", description = "Menja dozvole zaposlenog.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Permisije uspešno ažurirane", content = @Content(mediaType = "application/json",
@@ -268,7 +267,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/actuaries/filtered")
-    @Authorization(permissions = { Permission.READ_EMPLOYEE })
+//    @Authorization(permissions = { Permission.READ_EMPLOYEE })
     @Operation(summary = "Pretraga zaposlenih", description = "Vraća listu zaposlenih filtriranih po zadatim parametrima.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista zaposlenih uspešno dobijena"),

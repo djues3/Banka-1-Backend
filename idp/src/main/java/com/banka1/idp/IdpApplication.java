@@ -18,9 +18,9 @@ public class IdpApplication {
 	}
 
 	@Controller
-	@RequestMapping("")
+	@RequestMapping("/api/")
 	static class IdpApplicationController {
-		@GetMapping("")
+		@GetMapping
 		public ResponseEntity<String> get(Authentication authentication) {
 			log.info("Authentication: {}", authentication);
 			log.info("Authentication class: {}", authentication.getClass());

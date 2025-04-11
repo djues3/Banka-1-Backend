@@ -1,11 +1,11 @@
 package com.banka1.user.controllers;
 
 import com.banka1.user.DTO.request.LoginRequest;
-import com.banka1.user.aspect.Authorization;
-import com.banka1.user.service.BlackListTokenService;
 import com.banka1.user.service.AuthService;
+import com.banka1.user.service.BlackListTokenService;
 import com.banka1.user.utils.ResponseMessage;
 import com.banka1.user.utils.ResponseTemplate;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -14,7 +14,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -93,7 +95,7 @@ public class AuthController {
         )
     })
     @PostMapping("/logout")
-    @Authorization
+//    @Authorization
     public ResponseEntity<?> logout(@Parameter(
         description = "JWT token korisnika u Authorization header-u",
         required = true,
@@ -132,7 +134,7 @@ public class AuthController {
         )
     })
     @PostMapping("/refresh-token")
-    @Authorization
+//    @Authorization
     public ResponseEntity<?> refreshToken(@Parameter(
         description = "JWT token korisnika u Authorization header-u",
         required = true,

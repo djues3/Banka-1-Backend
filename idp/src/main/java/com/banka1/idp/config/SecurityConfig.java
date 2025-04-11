@@ -1,10 +1,13 @@
 package com.banka1.idp.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -15,11 +18,13 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -30,6 +35,8 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -43,17 +50,21 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final String frontendUrl;
+    private final String loginUrl;
 
-    public SecurityConfig(@Value("${frontend.url}") String frontendUrl) {
-        this.frontendUrl = frontendUrl;
+    public SecurityConfig(@Value("${frontend.login.url}") String loginUrl) {
+        this.loginUrl = loginUrl;
     }
 
     private static KeyPair generateRsaKey() {
@@ -76,6 +87,7 @@ public class SecurityConfig {
                 OAuth2AuthorizationServerConfigurer.authorizationServer();
 
         http.securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .with(
                         authorizationServerConfigurer,
@@ -93,7 +105,7 @@ public class SecurityConfig {
                 .exceptionHandling(
                         (exceptions) ->
                                 exceptions.defaultAuthenticationEntryPointFor(
-                                        new LoginUrlAuthenticationEntryPoint("/login"),
+                                        new LoginUrlAuthenticationEntryPoint(loginUrl),
                                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)));
 
         return http.build();
@@ -102,15 +114,26 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+
         http.authorizeHttpRequests((authorize) -> authorize.anyRequest().authenticated())
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
-                // Form login handles the redirect to the login page from the
-                // authorization server filter chain
-                .formLogin(fl -> {});
+                .formLogin(
+                        fl -> {
+                            fl.loginPage(loginUrl);
+                            fl.loginProcessingUrl("/api/idp/login");
+                            fl.usernameParameter("email");
+                            fl.failureHandler((req,res,ex) -> {
+                                res.setStatus(401);
+                                res.getWriter().write("Invalid credentials");
+                            });
+                        });
 
         return http.build();
     }
+
+
 
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
@@ -123,9 +146,11 @@ public class SecurityConfig {
                         .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                         .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                         .redirectUri("http://127.0.0.1:3001/login/oauth2/code/oidc-client")
+                        .redirectUri("https://oauth.pstmn.io/v1/callback")
                         .postLogoutRedirectUri("http://127.0.0.1:3001/")
                         .scope(OidcScopes.OPENID)
                         .scope(OidcScopes.PROFILE)
+                        .scope(OidcScopes.EMAIL)
                         .clientSettings(
                                 ClientSettings.builder()
                                         .requireAuthorizationConsent(false)
@@ -144,7 +169,45 @@ public class SecurityConfig {
                         .scope(OidcScopes.PROFILE)
                         .scope(OidcScopes.EMAIL)
                         .build();
-        return new InMemoryRegisteredClientRepository(oidcClient, publicClient);
+        RegisteredClient gatewayClient =
+                RegisteredClient.withId(UUID.randomUUID().toString())
+                        .clientId("gateway-client")
+                        .clientSecret("{noop}secrets")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://localhost/api/login/oauth2/code/idp")
+//                        .redirectUri("http://localhost/api/login/oauth2/code/idp")
+                        .scope("openid")
+                        .scope("email")
+                        .scope("profile")
+                        .build();
+        return new InMemoryRegisteredClientRepository(oidcClient, publicClient, gatewayClient);
+    }
+
+    /**
+     * Sets the custom token customizer to add the organizational unit to the token claims. Also, if
+     * the token is an id token, it adds the user's name, email, and position to the claims.
+     */
+    @Bean
+    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(ObjectMapper mapper) {
+        return (context) -> {
+            if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+                context.getClaims()
+                        .claims(
+                                (claims) -> {
+                                    Set<String> permissions =
+                                            AuthorityUtils.authorityListToSet(
+                                                            context.getPrincipal().getAuthorities())
+                                                    .stream()
+                                                    .collect(
+                                                            Collectors.collectingAndThen(
+                                                                    Collectors.toSet(),
+                                                                    Collections::unmodifiableSet));
+                                    claims.put("permissions", permissions);
+                                });
+            }
+            ;
+        };
     }
 
     @Bean
@@ -168,7 +231,7 @@ public class SecurityConfig {
 
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
-        return AuthorizationServerSettings.builder().build();
+        return AuthorizationServerSettings.builder().issuer("https://idp.localhost").build();
     }
 
     Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper() {
@@ -183,13 +246,25 @@ public class SecurityConfig {
 
     @Bean
     UrlBasedCorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        // TODO: Set allowed origins to be more specific
-        config.addAllowedOrigin("*");
-        config.addAllowedHeader("*");
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowCredentials(true);
+
+        config.setAllowedHeaders(
+                Arrays.asList(
+                        "Origin",
+                        "Content-Type",
+                        "Accept",
+                        "Authorization"));
+        config.setAllowedMethods(
+                Arrays.asList(
+                        "GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // Dynamic Access-Control-Allow-Origin: Set it to the Origin from the request
+        config.setAllowedOriginPatterns(
+                Collections.singletonList(
+                        "*"));
         source.registerCorsConfiguration("/**", config);
 
         return source;
