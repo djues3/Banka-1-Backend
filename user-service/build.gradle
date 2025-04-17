@@ -12,7 +12,7 @@ version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -47,9 +47,8 @@ dependencies {
 
     implementation project(":common")
     implementation project(path: ':common')
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
-    runtimeOnly 'org.aspectj:aspectjweaver'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     runtimeOnly 'org.apache.httpcomponents.client5:httpclient5'
     implementation 'org.modelmapper:modelmapper:3.1.1'
     implementation 'org.springframework.boot:spring-boot-starter-security'

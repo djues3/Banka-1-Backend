@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: gateway
+  cloud:
+    gateway:
+      mvc:
+        routes:
+          - id: user-service
+            uri: http://localhost:8081
+            predicates:
+              - Path=/api/user/**
+            filters:
+              - RewritePath=/api/user/(?<segment>.*), /$\{segment}
+              - TokenRelay=
+          - id: banking-service
+            uri: http://localhost:8082
+            predicates:
+              - Path=/api/banking/**
+            filters:
+              - RewritePath=/api/banking/(?<segment>.*), /$\{segment}
+              - TokenRelay=
+          - id: trading-service
+            uri: http://localhost:3000
+            predicates:
+              - Path=/api/trading/**
+            filters:
+              - RewritePath=/api/trading/(?<segment>.*), /$\{segment}
+              - TokenRelay=
+  security:
+    oauth2:
+      client:
+        provider:
+          idp:
+            issuer-uri: https://idp.localhost
+        registration:
+          idp:
+            provider: idp
+            client-id: gateway-client
+            client-secret: secrets
+            scope: openid, profile, email
+            authorization-grant-type: authorization_code
+            redirect-uri: "https://localhost/api/login/oauth2/code/idp"
+            client-name: idp
+  output:
+    ansi:
+      enabled: always
+  session:
+    timeout: 180m
+logging:
+  level:
+    org.springframework.security: trace
+server:
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        name: sid
+        same-site: lax
