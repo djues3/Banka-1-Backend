@@ -1,11 +1,9 @@
 package com.banka1.user.controllers;
 
-import com.banka1.common.model.Permission;
-import com.banka1.user.aspect.Authorization;
-import com.banka1.common.model.Position;
 import com.banka1.user.service.CustomerService;
 import com.banka1.user.service.EmployeeService;
 import com.banka1.user.utils.ResponseTemplate;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -13,9 +11,12 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
@@ -73,7 +74,8 @@ public class SearchController {
         )
     })
     @GetMapping("employees")
-    @Authorization(permissions = {Permission.LIST_EMPLOYEE})
+//    @Authorization(permissions = {Permission.LIST_EMPLOYEE})
+    @PreAuthorize("hasRole('LIST_EMPLOYEE') or principal.isAdmin")
     public ResponseEntity<?> searchEmployees(
             @Parameter(
                     description = "Redni broj stranice rezultata (podrazumevana vrednost je prva stranica)",
@@ -158,7 +160,8 @@ public class SearchController {
         )
     })
     @GetMapping("customers")
-    @Authorization(permissions = { Permission.LIST_CUSTOMER })
+//    @Authorization(permissions = { Permission.LIST_CUSTOMER })
+    @PreAuthorize("hasRole('LIST_CUSTOMER') or principal.isAdmin")
     public ResponseEntity<?> searchCustomers(
             @Parameter(
                     description = "Redni broj stranice rezultata (podrazumevana vrednost je prva stranica)",

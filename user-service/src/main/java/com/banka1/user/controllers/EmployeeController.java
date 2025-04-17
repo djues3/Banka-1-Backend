@@ -3,7 +3,6 @@ package com.banka1.user.controllers;
 import com.banka1.user.DTO.request.CreateEmployeeRequest;
 import com.banka1.user.DTO.request.UpdateEmployeeRequest;
 import com.banka1.user.DTO.request.UpdatePermissionsRequest;
-import com.banka1.user.aspect.Authorization;
 import com.banka1.user.model.Employee;
 import com.banka1.common.model.Permission;
 import com.banka1.common.model.Position;
@@ -21,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -74,7 +74,8 @@ public class EmployeeController {
             )
     })
     @GetMapping("/{id}")
-    @Authorization(permissions = { Permission.READ_EMPLOYEE }, allowIdFallback = true )
+//    @Authorization(permissions = { Permission.READ_EMPLOYEE }, allowIdFallback = true )
+    @PreAuthorize("hasRole('READ_EMPLOYEE') or principal.id == #id or principal.isAdmin")
     public ResponseEntity<?> getById(
             @Parameter(required = true, example = "1")
             @PathVariable String id
@@ -91,7 +92,7 @@ public class EmployeeController {
     }
 
     @PostMapping("/")
-    @Authorization(permissions = { Permission.CREATE_EMPLOYEE }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.CREATE_EMPLOYEE }, positions = { Position.HR })
     @Operation(summary = "Kreiranje zaposlenog", description = "Dodaje novog zaposlenog u sistem.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Zaposleni uspešno kreiran", content = @Content(mediaType = "application/json",
@@ -122,6 +123,7 @@ public class EmployeeController {
             """))
             )
     })
+    @PreAuthorize("(hasRole('CREATE_EMPLOYEE') and principal.department == 'HR') or principal.isAdmin")
     public ResponseEntity<?> createEmployee(@RequestBody CreateEmployeeRequest createEmployeeRequest) {
         Employee savedEmployee;
         try {
@@ -140,7 +142,7 @@ public class EmployeeController {
 
 
     @PutMapping("/{id}")
-    @Authorization(permissions = { Permission.EDIT_EMPLOYEE }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.EDIT_EMPLOYEE }, positions = { Position.HR })
     @Operation(summary = "Ažuriranje zaposlenog", description = "Menja podatke zaposlenog na osnovu ID-a.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Podaci uspešno ažurirani", content = @Content(mediaType = "application/json",
@@ -169,6 +171,7 @@ public class EmployeeController {
                 }
             """)))
     })
+    @PreAuthorize("(hasRole('EDIT_EMPLOYEE') and principal.department == 'HR') or principal.isAdmin")
     public ResponseEntity<?> updateEmployee(@PathVariable Long id, @RequestBody UpdateEmployeeRequest updateEmployeeRequest) {
         try {
             employeeService.updateEmployee(id, updateEmployeeRequest);
@@ -180,7 +183,7 @@ public class EmployeeController {
     }
 
     @DeleteMapping("/{id}")
-    @Authorization(permissions = { Permission.DELETE_EMPLOYEE }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.DELETE_EMPLOYEE }, positions = { Position.HR })
     @Operation(summary = "Brisanje zaposlenog", description = "Briše zaposlenog iz sistema po ID-u.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Korisnik uspešno obrisan", content = @Content(mediaType = "application/json",
@@ -209,6 +212,7 @@ public class EmployeeController {
                 }
             """)))
     })
+    @PreAuthorize("(hasRole('DELETE_EMPLOYEE') and principal.department == 'HR') or principal.isAdmin")
     public ResponseEntity<?> deleteEmployee(@PathVariable Long id) {
         if (!employeeService.existsById(id)) {
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.NOT_FOUND), false, null, "Zaposleni sa ID-em " + id + " nije pronađen.");
@@ -223,7 +227,7 @@ public class EmployeeController {
     }
 
     @PutMapping("/{id}/permissions")
-    @Authorization(permissions = { Permission.SET_EMPLOYEE_PERMISSION }, positions = { Position.HR })
+//    @Authorization(permissions = { Permission.SET_EMPLOYEE_PERMISSION }, positions = { Position.HR })
     @Operation(summary = "Ažuriranje permisija zaposlenom", description = "Menja dozvole zaposlenog.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Permisije uspešno ažurirane", content = @Content(mediaType = "application/json",
@@ -252,6 +256,7 @@ public class EmployeeController {
                 }
             """)))
     })
+    @PreAuthorize("(hasRole('SET_EMPLOYEE_PERMISSION') and principal.department == 'HR') or principal.isAdmin")
     public ResponseEntity<?> updatePermissions(@PathVariable Long id, @RequestBody UpdatePermissionsRequest updatePermissionsRequest){
 
         if (!employeeService.existsById(id)) {
@@ -268,12 +273,13 @@ public class EmployeeController {
     }
 
     @GetMapping("/actuaries/filtered")
-    @Authorization(permissions = { Permission.READ_EMPLOYEE })
+//    @Authorization(permissions = { Permission.READ_EMPLOYEE })
     @Operation(summary = "Pretraga zaposlenih", description = "Vraća listu zaposlenih filtriranih po zadatim parametrima.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista zaposlenih uspešno dobijena"),
             @ApiResponse(responseCode = "400", description = "Neispravni parametri pretrage")
     })
+    @PreAuthorize("hasRole('READ_EMPLOYEE') or principal.isAdmin")
     public ResponseEntity<?> getFilteredActuaryEmployees(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
@@ -289,6 +295,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/actuaries")
+    @PreAuthorize("hasRole('READ_EMPLOYEE') or principal.isAdmin")
     public ResponseEntity<?> fetchActuaries(){
         var employees = employeeService.getAllActuaries();
         return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK), true, employees, null);
