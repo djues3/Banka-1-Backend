@@ -16,16 +16,5 @@ public class IdpApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(IdpApplication.class, args);
 	}
-
-	@Controller
-	@RequestMapping("")
-	static class IdpApplicationController {
-		@GetMapping("")
-		public ResponseEntity<String> get(Authentication authentication) {
-			log.info("Authentication: {}", authentication);
-			log.info("Authentication class: {}", authentication.getClass());
-			return ResponseEntity.ok("IDP is running");
-		}
-	}
 }
 
