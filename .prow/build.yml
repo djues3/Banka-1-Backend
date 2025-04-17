@@ -43,7 +43,7 @@ postsubmits:
         # koristite:
         #   - harbor.k8s.elab.rs/base-images/base:java-21-node-18-docker (Java 21)
         #   - harbor.k8s.elab.rs/base-images/base:java-17-node-18-docker (Java 17)
-        - image: harbor.k8s.elab.rs/base-images/base:gradle-17-node-22-docker
+        - image: harbor.k8s.elab.rs/base-images/base:gradle-21-node-22-docker
           command:
             - /bin/bash
             - -c
