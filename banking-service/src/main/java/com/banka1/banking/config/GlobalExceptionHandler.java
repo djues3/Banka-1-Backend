@@ -2,6 +2,7 @@ package com.banka1.banking.config;
 
 import com.banka1.banking.utils.ResponseTemplate;
 import io.swagger.v3.oas.annotations.Hidden;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,14 +12,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Hidden
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<?> handleRuntime(RuntimeException ex) {
-        System.out.println(ex.getMessage());
-        System.out.println(ex.getStackTrace());
+        log.error("Error occurred: {}", ex.getMessage(), ex);
         return ResponseTemplate.create(
                 ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR),
                 false,

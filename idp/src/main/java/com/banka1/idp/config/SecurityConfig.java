@@ -279,7 +279,7 @@ public class SecurityConfig {
             JwtAuthenticationToken principal =
                     (JwtAuthenticationToken) authentication.getPrincipal();
 
-            return new OidcUserInfo(principal.getToken().getClaims());
+            return new OidcUserInfo(authentication.getToken().getClaims());
         };
     }
 

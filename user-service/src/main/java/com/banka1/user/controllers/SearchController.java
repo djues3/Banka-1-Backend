@@ -75,7 +75,7 @@ public class SearchController {
     })
     @GetMapping("employees")
 //    @Authorization(permissions = {Permission.LIST_EMPLOYEE})
-    @PreAuthorize("hasRole('LIST_EMPLOYEE') or principal.isAdmin")
+    @PreAuthorize("hasRole('LIST_EMPLOYEE') or authentication.isAdmin")
     public ResponseEntity<?> searchEmployees(
             @Parameter(
                     description = "Redni broj stranice rezultata (podrazumevana vrednost je prva stranica)",
@@ -161,7 +161,7 @@ public class SearchController {
     })
     @GetMapping("customers")
 //    @Authorization(permissions = { Permission.LIST_CUSTOMER })
-    @PreAuthorize("hasRole('LIST_CUSTOMER') or principal.isAdmin")
+    @PreAuthorize("hasRole('LIST_CUSTOMER') or authentication.isAdmin")
     public ResponseEntity<?> searchCustomers(
             @Parameter(
                     description = "Redni broj stranice rezultata (podrazumevana vrednost je prva stranica)",

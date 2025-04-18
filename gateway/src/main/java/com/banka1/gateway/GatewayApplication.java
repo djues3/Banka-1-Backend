@@ -119,7 +119,15 @@ class UserInfoController {
                 }
 
                 if (resourceAccess.containsKey("position")) {
-                    response.put("position", resourceAccess.get("position"));
+                    Object position = resourceAccess.get("position");
+                    if (position instanceof String p) {
+                        if ("N/A".equalsIgnoreCase(p) || "NONE".equalsIgnoreCase(p)) {
+                            p = "NONE";
+                        }
+                        response.put("position", p);
+                    } else {
+                        response.put("position", position);
+                    }
                 }
             }
 

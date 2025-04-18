@@ -78,7 +78,7 @@ public class CustomerController {
         )
     })
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('READ_CUSTOMER') or principal.id == #id or principal.isAdmin")
+    @PreAuthorize("hasRole('READ_CUSTOMER') or authentication.userId == #id or authentication.isAdmin")
     public ResponseEntity<?> getById(
             @Parameter(required = true, example = "1")
             @PathVariable String id
@@ -95,7 +95,7 @@ public class CustomerController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('CREATE_CUSTOMER') or principal.isAdmin")
+    @PreAuthorize("hasRole('CREATE_CUSTOMER') or authentication.isAdmin")
     @Operation(summary = "Kreiranje mušterije", description = "Kreira mušteriju i vraća ID kreirane mušterije")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Mušterija uspešno kreirana", content = @Content(mediaType = "application/json",
@@ -147,7 +147,7 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('EDIT_CUSTOMER') or principal.id == #id or principal.isAdmin")
+    @PreAuthorize("hasRole('EDIT_CUSTOMER') or authentication.userId == #id or authentication.isAdmin")
     @Operation(summary = "Ažuriranje mušterije")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Podaci korisnika ažurirani", content = @Content(mediaType = "application/json",
@@ -191,7 +191,7 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('DELETE_CUSTOMER') or principal.isAdmin")
+    @PreAuthorize("hasRole('DELETE_CUSTOMER') or authentication.isAdmin")
     @Operation(summary = "Brisanje mušterije")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Korisnik uspešno obrisan", content = @Content(mediaType = "application/json",
@@ -233,7 +233,7 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}/permissions")
-    @PreAuthorize("hasRole('SET_CUSTOMER_PERMISSION') or principal.isAdmin")
+    @PreAuthorize("hasRole('SET_CUSTOMER_PERMISSION') or authentication.isAdmin")
     @Operation(summary = "Ažuriranje permisija mušterije")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Uspesno ažurirane permisije", content = @Content(mediaType = "application/json",

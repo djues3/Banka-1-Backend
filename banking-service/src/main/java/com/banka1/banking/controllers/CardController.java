@@ -1,6 +1,5 @@
 package com.banka1.banking.controllers;
 
-import com.banka1.banking.aspect.CardAuthorization;
 import com.banka1.banking.dto.CreateCardDTO;
 import com.banka1.banking.dto.UpdateCardDTO;
 import com.banka1.banking.dto.UpdateCardLimitDTO;
@@ -9,6 +8,7 @@ import com.banka1.banking.models.Card;
 import com.banka1.banking.services.CardService;
 import com.banka1.banking.utils.ResponseMessage;
 import com.banka1.banking.utils.ResponseTemplate;
+import com.banka1.common.security.annotation.IsEmployed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -106,7 +107,8 @@ public class CardController {
             """))
         )
     })
-    @CardAuthorization
+//    @CardAuthorization
+    @PreAuthorize("@accountSecurity.isAccountOwner(#accountId, authentication.id) or authentication.isAdmin or authentication.isEmployed")
     public ResponseEntity<?> getCardsByAccountID(@PathVariable("account_id") int accountId) {
         return getCards(accountId);
     }
@@ -142,7 +144,8 @@ public class CardController {
             """))
         )
     })
-    @CardAuthorization
+//    @CardAuthorization
+    @PreAuthorize("@accountSecurity.isAccountOwner(#createCardDTO.accountID, authentication.id) or authentication.isAdmin or authentication.isEmployed")
     public ResponseEntity<?> createCard(@RequestBody CreateCardDTO createCardDTO) {
         try {
             Card card = cardService.createCard(createCardDTO);
@@ -175,7 +178,8 @@ public class CardController {
             """))
         )
     })
-    @CardAuthorization
+//    @CardAuthorization
+    @PreAuthorize("@cardSecurity.isCardOwner(#cardId, authentication.userId) or authentication.isAdmin or authentication.isEmployed")
     public ResponseEntity<?> blockCard(@PathVariable("card_id") int cardId, @RequestBody UpdateCardDTO updateCardDTO) {
         try {
             cardService.blockCard(cardId, updateCardDTO);
@@ -257,7 +261,8 @@ public class CardController {
             """))
         )
     })
-    @CardAuthorization(employeeOnlyOperation = true)
+//    @CardAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getAdminCardsByAccountID(@PathVariable("account_id") int accountId) {
         return getCards(accountId);
     }
@@ -284,7 +289,8 @@ public class CardController {
             """))
         )
     })
-    @CardAuthorization(employeeOnlyOperation = true)
+//    @CardAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> activateCard(@PathVariable("card_id") int cardId, @RequestBody UpdateCardDTO updateCardDTO) {
         try {
             cardService.activateCard(cardId, updateCardDTO);
@@ -327,7 +333,8 @@ public class CardController {
             """))
         )
     })
-    @CardAuthorization
+//    @CardAuthorization
+    @PreAuthorize("@cardSecurity.isCardOwner(#cardId, authentication.id) or authentication.isAdmin or authentication.isEmployed")
     public ResponseEntity<?> updateCardLimit(@PathVariable("card_id") Long cardId, @RequestBody UpdateCardLimitDTO updateCardLimitDTO) {
         try {
             cardService.updateCardLimit(cardId, updateCardLimitDTO);
@@ -360,7 +367,8 @@ public class CardController {
             """))
         )
     })
-    @CardAuthorization
+//    @CardAuthorization
+    @PreAuthorize("@cardSecurity.isCardOwner(#cardId, authentication.id) or authentication.isAdmin or authentication.isEmployed")
     public ResponseEntity<?> updateCardName(@PathVariable("card_id") Long cardId, @RequestBody UpdateCardNameDTO updateCardNameDTO) {
         try {
             cardService.updateCardName(cardId, updateCardNameDTO);

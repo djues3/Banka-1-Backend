@@ -1,6 +1,6 @@
 package com.banka1.common.annotation;
 
-import com.banka1.common.security.SecurityConfig;
+import com.banka1.common.security.SharedSecurityConfig;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
@@ -16,6 +16,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @SpringBootApplication
-@Import(SecurityConfig.class)
+@Import(SharedSecurityConfig.class)
 public @interface Bank1Application {
 }

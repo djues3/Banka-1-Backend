@@ -1,13 +1,11 @@
 package com.banka1.banking.controllers;
 
-import com.banka1.banking.aspect.AccountAuthorization;
-import com.banka1.banking.aspect.Authorization;
-import com.banka1.banking.models.Transfer;
-import com.banka1.banking.services.TransferService;
 import com.banka1.banking.dto.InternalTransferDTO;
 import com.banka1.banking.dto.MoneyTransferDTO;
-import com.banka1.banking.services.implementation.AuthService;
+import com.banka1.banking.services.TransferService;
 import com.banka1.banking.utils.ResponseTemplate;
+import com.banka1.common.security.annotation.UserClaim;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -15,12 +13,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -30,7 +29,6 @@ import java.util.Map;
 public class TransferController {
 
     private final TransferService transferService;
-    private final AuthService authService;
 
     @Operation(
             summary = "Interni prenos",
@@ -58,7 +56,7 @@ public class TransferController {
         )
     })
     @PostMapping("/internal-transfer")
-    @AccountAuthorization(customerOnlyOperation = true)
+//    @AccountAuthorization(customerOnlyOperation = true)
     public ResponseEntity<?> internalTransfer(
             @RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Podaci za interni transfer",
@@ -112,7 +110,7 @@ public class TransferController {
         )
     })
     @PostMapping("/money-transfer")
-    @AccountAuthorization(customerOnlyOperation = true)
+//    @AccountAuthorization(customerOnlyOperation = true)
     public ResponseEntity<?> moneyTransfer(
             @RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Podaci za prenos novca",
@@ -148,7 +146,7 @@ public class TransferController {
     }
 
     @GetMapping("/mobile-transfers")
-    @Authorization
+//    @Authorization
     @Operation(
             summary = "Prikaz svih transfera",
             description = "Prikazuje sve transfere koji su napravljeni sa računa korisnika."
@@ -186,10 +184,8 @@ public class TransferController {
                             """))
             )
     })
-    public ResponseEntity<?> getTransfers(@RequestHeader(value = "Authorization") String authorization) {
+    public ResponseEntity<?> getTransfers(@UserClaim Long userId) {
         try {
-            System.out.println("Authorization: " + authorization);
-            Long userId = authService.parseToken(authService.getToken(authorization)).get("id", Long.class);
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK), true, Map.of("transfers", transferService.getAllTransfersStartedByUser(userId)), null);
         } catch (Exception e) {
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.BAD_REQUEST), false, null, e.getMessage());

@@ -1,10 +1,11 @@
 package com.banka1.banking;
 
+import com.banka1.common.annotation.Bank1Application;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication
+@Bank1Application
 @EnableScheduling
 public class BankingServiceApplication {
 

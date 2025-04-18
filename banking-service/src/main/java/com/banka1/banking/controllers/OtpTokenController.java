@@ -1,6 +1,5 @@
 package com.banka1.banking.controllers;
 
-import com.banka1.banking.aspect.AccountAuthorization;
 import com.banka1.banking.dto.OtpTokenDTO;
 import com.banka1.banking.models.Transfer;
 import com.banka1.banking.models.helper.TransferStatus;
@@ -19,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -54,7 +54,8 @@ public class OtpTokenController {
             )
     })
     @PostMapping("/verification")
-    @AccountAuthorization(customerOnlyOperation = true)
+//    @AccountAuthorization(customerOnlyOperation = true)
+    @PreAuthorize("@transferSecurity.initiatedTransfer(#otpTokenDTO.transferId, authentication.userId)")
     public ResponseEntity<?> verifyOtp(@RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "Podaci za verifikaciju OTP koda",
             required = true,

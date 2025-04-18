@@ -214,7 +214,7 @@ public class LoanService {
                 true
         );
     }
-
+    @Transactional
     public Loan updateLoanRequest(Long loanId, LoanUpdateDTO loanUpdateDTO) {
         try {
             // Find the loan
@@ -290,6 +290,7 @@ public class LoanService {
             return loan;
         } catch (Exception e) {
             log.warn("Error updating loan: {}", e.getMessage());
+            log.error("Stacktrace: ", e);
             throw new RuntimeException("Error updating loan: " + e.getMessage());
         }
     }

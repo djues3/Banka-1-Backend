@@ -1,6 +1,5 @@
 package com.banka1.banking.controllers;
 
-import com.banka1.banking.aspect.CompanyAuthorization;
 import com.banka1.banking.dto.CreateCompanyDTO;
 
 import com.banka1.banking.models.Account;
@@ -9,6 +8,7 @@ import com.banka1.banking.services.CompanyService;
 
 import com.banka1.banking.utils.ResponseMessage;
 import com.banka1.banking.utils.ResponseTemplate;
+import com.banka1.common.security.annotation.IsEmployed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -65,7 +65,8 @@ public class CompanyController {
             """))
             )
     })
-    @CompanyAuthorization(employeeOnlyOperation = true)
+//    @CompanyAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> createCompany(@RequestBody CreateCompanyDTO createCompanyDTO) {
         try {
             Company company = companyService.createCompany(createCompanyDTO);
@@ -114,7 +115,8 @@ public class CompanyController {
             """))
             )
     })
-    @CompanyAuthorization(employeeOnlyOperation = true)
+//    @CompanyAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getCompanies() {
         try {
             List<Company> companies  =  companyService.getCompanies();
@@ -161,7 +163,8 @@ public class CompanyController {
             """))
             )
     })
-    @CompanyAuthorization(employeeOnlyOperation = true)
+//    @CompanyAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getCompanyByID(@PathVariable("company_id") Long companyId) {
         try {
             Company company  =  companyService.getCompany(companyId);
@@ -208,7 +211,8 @@ public class CompanyController {
             """))
             )
     })
-    @CompanyAuthorization(employeeOnlyOperation = true)
+//    @CompanyAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getBasList() {
         try {
             List<String> lista =  companyService.getBusinessActivityCodes();
@@ -257,7 +261,8 @@ public class CompanyController {
             """))
             )
     })
-    @CompanyAuthorization(employeeOnlyOperation = true)
+//    @CompanyAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getCompaniesByOwnerID(@PathVariable("owner_id") Long ownerId) {
         try {
             List<Company> companies = companyService.findAllByOwnerId(ownerId);
@@ -307,6 +312,7 @@ public class CompanyController {
             """))
             )
     })
+    // FIXME: why is this not protected???
     public ResponseEntity<?> getAccountsByCompanyID(@PathVariable("company_id") Long companyId) {
         try {
             List<Account> accounts = companyService.findAllAccountsByCompanyId(companyId);

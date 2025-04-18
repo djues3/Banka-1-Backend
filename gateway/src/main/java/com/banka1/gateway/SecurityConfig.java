@@ -16,6 +16,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 
 @Configuration
 public class SecurityConfig {
@@ -48,7 +49,17 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+        return http.authorizeHttpRequests(
+                        auth ->
+                                auth.requestMatchers(
+                                                "/api/banking/currency/**",
+                                                "/api/banking/metadata/**",
+                                                "/api/user/api/users/reset-password",
+                                                "/api/user/api/set-password")
+                                        .permitAll()
+                                        .anyRequest()
+                                        .authenticated())
+
                 // Used to simplify the proxy configuration
                 .csrf(AbstractHttpConfigurer::disable)
                 .oauth2Login(
@@ -56,15 +67,25 @@ public class SecurityConfig {
                                 o.loginProcessingUrl("/api/login/oauth2/code/idp")
                                         .successHandler(
                                                 (req, res, auth) -> {
-                                                    log.info("User {} authenticated", auth);
-                                                    if (auth
+                                                    if (!(auth
                                                             instanceof
-                                                            OAuth2AuthenticationToken token) {
-                                                        log.info(
-                                                                "Token class {}: ",
-                                                                auth.getClass());
+                                                            OAuth2AuthenticationToken token)) {
+                                                        throw new IllegalArgumentException(
+                                                                "Unknown authentication type for oauth2Login");
                                                     }
-                                                    res.sendRedirect("/employee-home");
+                                                    Map<String, Object> resourceAccess =
+                                                            token.getPrincipal()
+                                                                    .getAttribute(
+                                                                            "resource_access");
+                                                    if (resourceAccess == null) {
+                                                        throw new IllegalArgumentException(
+                                                                "Invalid OAuth2AuthenticationToken");
+                                                    }
+                                                    String position =
+                                                            (String) resourceAccess.get("position");
+                                                    if (position.equalsIgnoreCase("N/A"))
+                                                        res.sendRedirect("/customer-home");
+                                                    else res.sendRedirect("/employee-home");
                                                 }))
                 .logout(
                         logout ->

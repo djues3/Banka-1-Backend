@@ -75,7 +75,7 @@ public class EmployeeController {
     })
     @GetMapping("/{id}")
 //    @Authorization(permissions = { Permission.READ_EMPLOYEE }, allowIdFallback = true )
-    @PreAuthorize("hasRole('READ_EMPLOYEE') or principal.id == #id or principal.isAdmin")
+    @PreAuthorize("hasRole('READ_EMPLOYEE') or authentication.userId == #id or authentication.isAdmin")
     public ResponseEntity<?> getById(
             @Parameter(required = true, example = "1")
             @PathVariable String id
@@ -123,7 +123,7 @@ public class EmployeeController {
             """))
             )
     })
-    @PreAuthorize("(hasRole('CREATE_EMPLOYEE') and principal.department == 'HR') or principal.isAdmin")
+    @PreAuthorize("(hasRole('CREATE_EMPLOYEE') and authentication.department == 'HR') or authentication.isAdmin")
     public ResponseEntity<?> createEmployee(@RequestBody CreateEmployeeRequest createEmployeeRequest) {
         Employee savedEmployee;
         try {
@@ -171,7 +171,7 @@ public class EmployeeController {
                 }
             """)))
     })
-    @PreAuthorize("(hasRole('EDIT_EMPLOYEE') and principal.department == 'HR') or principal.isAdmin")
+    @PreAuthorize("(hasRole('EDIT_EMPLOYEE') and authentication.department == 'HR') or authentication.isAdmin")
     public ResponseEntity<?> updateEmployee(@PathVariable Long id, @RequestBody UpdateEmployeeRequest updateEmployeeRequest) {
         try {
             employeeService.updateEmployee(id, updateEmployeeRequest);
@@ -212,7 +212,7 @@ public class EmployeeController {
                 }
             """)))
     })
-    @PreAuthorize("(hasRole('DELETE_EMPLOYEE') and principal.department == 'HR') or principal.isAdmin")
+    @PreAuthorize("(hasRole('DELETE_EMPLOYEE') and authentication.department == 'HR') or authentication.isAdmin")
     public ResponseEntity<?> deleteEmployee(@PathVariable Long id) {
         if (!employeeService.existsById(id)) {
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.NOT_FOUND), false, null, "Zaposleni sa ID-em " + id + " nije pronađen.");
@@ -256,7 +256,7 @@ public class EmployeeController {
                 }
             """)))
     })
-    @PreAuthorize("(hasRole('SET_EMPLOYEE_PERMISSION') and principal.department == 'HR') or principal.isAdmin")
+    @PreAuthorize("(hasRole('SET_EMPLOYEE_PERMISSION') and authentication.department == 'HR') or authentication.isAdmin")
     public ResponseEntity<?> updatePermissions(@PathVariable Long id, @RequestBody UpdatePermissionsRequest updatePermissionsRequest){
 
         if (!employeeService.existsById(id)) {
@@ -279,7 +279,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "200", description = "Lista zaposlenih uspešno dobijena"),
             @ApiResponse(responseCode = "400", description = "Neispravni parametri pretrage")
     })
-    @PreAuthorize("hasRole('READ_EMPLOYEE') or principal.isAdmin")
+    @PreAuthorize("hasRole('READ_EMPLOYEE') or authentication.isAdmin")
     public ResponseEntity<?> getFilteredActuaryEmployees(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
@@ -295,7 +295,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/actuaries")
-    @PreAuthorize("hasRole('READ_EMPLOYEE') or principal.isAdmin")
+    @PreAuthorize("hasRole('READ_EMPLOYEE') or authentication.isAdmin")
     public ResponseEntity<?> fetchActuaries(){
         var employees = employeeService.getAllActuaries();
         return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK), true, employees, null);

@@ -1,6 +1,5 @@
 package com.banka1.banking.controllers;
 
-import com.banka1.banking.aspect.AccountAuthorization;
 import com.banka1.banking.dto.ExchangeMoneyTransferDTO;
 import com.banka1.banking.dto.ExchangePreviewDTO;
 import com.banka1.banking.services.ExchangeService;
@@ -53,7 +52,7 @@ public class ExchangeController {
         )
     })
     @PostMapping
-    @AccountAuthorization(customerOnlyOperation = true)
+//    @AccountAuthorization(customerOnlyOperation = true)
     public ResponseEntity<?> exchangeMoneyTransfer(
             @RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Podaci za transfer sa konverzijom",
@@ -130,40 +129,5 @@ public class ExchangeController {
                     .body(Map.of("error", e.getMessage()));
         }
     }
-
-//    @Operation(summary = "Pregled kursa za stranu valutu pre razmene", description = "Vraća kurs za obe strane valute, ukupnu proviziju i konačan iznos nakon oduzimanja provizije.")
-//    @ApiResponses(value = {
-//        @ApiResponse(responseCode = "200", description = "Uspešno izračunata konverzija strane valute", content = @Content(mediaType = "application/json",
-//            examples = @ExampleObject(value = """
-//                {
-//                    "firstExchangeRate": 117.5,
-//                    "secondExchangeRate": 105.2,
-//                    "totalFee": 5.0,
-//                    "finalAmount": 95.0
-//                }
-//            """))
-//        ),
-//        @ApiResponse(responseCode = "400", description = "Nevalidni podaci ili nepostojeći kurs", content = @Content(mediaType = "application/json",
-//            examples = @ExampleObject(value = """
-//                {
-//                    "error": "Kurs nije pronađen za traženu konverziju."
-//                }
-//            """))
-//        )
-//    })
-//    @PostMapping("/preview-foreign")
-//    public ResponseEntity<?> previewExchangeForeign(@RequestBody ExchangePreviewDTO exchangePreviewDTO) {
-//        try {
-//            Map<String, Object> previewData = exchangeService.calculatePreviewExchangeForeign(
-//                    exchangePreviewDTO.getFromCurrency(),
-//                    exchangePreviewDTO.getToCurrency(),
-//                    exchangePreviewDTO.getAmount()
-//            );
-//            return ResponseEntity.ok(previewData);
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-//                    .body(Map.of("error", e.getMessage()));
-//        }
-//    }
 
 }

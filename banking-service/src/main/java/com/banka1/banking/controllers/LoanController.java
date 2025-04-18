@@ -1,13 +1,13 @@
 package com.banka1.banking.controllers;
-import com.banka1.banking.aspect.LoanAuthorization;
 import com.banka1.banking.dto.request.CreateLoanDTO;
 import com.banka1.banking.dto.request.LoanUpdateDTO;
 import com.banka1.banking.models.Installment;
 import com.banka1.banking.models.Loan;
 import com.banka1.banking.services.LoanService;
-import com.banka1.banking.services.implementation.AuthService;
 import com.banka1.banking.utils.ResponseMessage;
 import com.banka1.banking.utils.ResponseTemplate;
+import com.banka1.common.security.annotation.IsEmployed;
+import com.banka1.common.security.annotation.UserClaim;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -31,7 +32,6 @@ import java.util.Map;
 @Tag(name = "Loan API", description = "API za pozive vezane za kredite i rate")
 public class LoanController {
     private final LoanService loanService;
-    private final AuthService authService;
 
     @PostMapping("/")
     @Operation(summary = "Kreiranje zahteva za kredit", description = "Dodaje novi kredit u sistem i cuva se u bazi pod statusom na cekanju.")
@@ -56,7 +56,8 @@ public class LoanController {
             """))
         ),
     })
-    @LoanAuthorization(customerOnlyOperation = true)
+//    @LoanAuthorization(customerOnlyOperation = true)
+    @PreAuthorize("@accountSecurity.isAccountOwner(#createLoanDTO.accountId, authentication.userId)")
     public ResponseEntity<?> createLoan(@Valid @RequestBody CreateLoanDTO createLoanDTO) {
         Loan newLoan;
         try {
@@ -144,7 +145,8 @@ public class LoanController {
             """))
         )
     })
-    @LoanAuthorization(employeeOnlyOperation = true)
+//    @LoanAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getPendingLoans() {
         try {
             List<Loan> loans = loanService.getPendingLoans();
@@ -222,7 +224,8 @@ public class LoanController {
             """))
         )
     })
-    @LoanAuthorization(employeeOnlyOperation = true)
+//    @LoanAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getAllUserLoans(
             @PathVariable("user_id") Long userId) {
         try {
@@ -295,9 +298,9 @@ public class LoanController {
         )
     })
     public ResponseEntity<?> getLoansByUserId(
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
+            @UserClaim Long ownerId) {
         try {
-            Long ownerId = authService.parseToken(authService.getToken(authorization)).get("id", Long.class);
+
             List<Loan> loans = loanService.getAllUserLoans(ownerId);
 
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK), true, Map.of("loans", loans), null);
@@ -367,7 +370,8 @@ public class LoanController {
             """))
         )
     })
-    @LoanAuthorization(employeeOnlyOperation = true)
+//    @LoanAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getAllLoans(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         try {
@@ -438,7 +442,8 @@ public class LoanController {
             """))
         )
     })
-    @LoanAuthorization
+//    @LoanAuthorization
+    @PreAuthorize("@loanSecurity.isLoanOwner(#loanId, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
     public ResponseEntity<?> getLoanDetails(@PathVariable("loan_id") Long loanId) {
         try {
             Loan loan = loanService.getLoanDetails(loanId);
@@ -511,7 +516,8 @@ public class LoanController {
             """))
         )
     })
-    @LoanAuthorization(employeeOnlyOperation = true)
+//    @LoanAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getLoanDetails(
             @PathVariable("user_id") Long userId,
             @PathVariable("loan_id") Long loanId) {
@@ -588,7 +594,8 @@ public class LoanController {
             """))
         )
     })
-    @LoanAuthorization(employeeOnlyOperation = true)
+//    @LoanAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> updateLoanRequest(
             @PathVariable("loan_id") Long loanId,
             @RequestBody LoanUpdateDTO loanUpdateDTO) {
@@ -698,7 +705,8 @@ public class LoanController {
             """))
         )
     })
-    @LoanAuthorization(employeeOnlyOperation = true)
+//    @LoanAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getUserInstallments(@PathVariable("user_id") Long userId) {
         try {
             List<Installment> installments = loanService.getUserInstallments(userId);
@@ -792,10 +800,9 @@ public class LoanController {
             """))
         )
     })
-    public ResponseEntity<?> getUserInstallments(
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
+    public ResponseEntity<?> getInstallmentsForUser(
+           @UserClaim Long userId) {
         try {
-            Long userId = authService.parseToken(authService.getToken(authorization)).get("id", Long.class);
             List<Installment> installments = loanService.getUserInstallments(userId);
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK), true, Map.of("installments", installments), null);
         } catch (Exception e) {
@@ -827,9 +834,9 @@ public class LoanController {
     })
     public ResponseEntity<?> getRemainingInstallments(
             @PathVariable("loan_id") Long loanId,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
+            @UserClaim Long ownerId) {
         try {
-            Long ownerId = authService.parseToken(authService.getToken(authorization)).get("id", Long.class);
+            // technically is secured, I guesS?
             Integer num = loanService.calculateRemainingInstallments(ownerId, loanId);
             if (num == null) {
                 return ResponseTemplate.create(ResponseEntity.status(HttpStatus.NOT_FOUND), false, null,
@@ -870,7 +877,8 @@ public class LoanController {
             """))
         ),
     })
-    @LoanAuthorization(employeeOnlyOperation = true)
+//    @LoanAuthorization(employeeOnlyOperation = true)
+    @IsEmployed
     public ResponseEntity<?> getRemainingInstallments() {
         try {
             loanService.processLoanPayments();
@@ -881,6 +889,7 @@ public class LoanController {
     }
 
     @GetMapping("/has-approved-loan/{userId}")
+    @PreAuthorize("authentication.isEmployed or authentication.isAdmin or authentication.userId = #userId")
     public ResponseEntity<?> hasApprovedLoan(@PathVariable("userId") Long userId) {
         try {
             boolean hasLoan = loanService.hasApprovedLoan(userId);

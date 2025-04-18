@@ -1,6 +1,4 @@
 package com.banka1.banking.controllers;
-
-import com.banka1.banking.aspect.ReceiverAuthorization;
 import com.banka1.banking.dto.ReceiverDTO;
 import com.banka1.banking.models.Receiver;
 import com.banka1.banking.services.ReceiverService;
@@ -16,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,7 +43,8 @@ public class ReceiverController {
             )
     })
     @PostMapping
-    @ReceiverAuthorization
+//    @ReceiverAuthorization
+    @PreAuthorize("@accountSecurity.isAccountOwner(receiverDTO.ownerAccountId, authentication.userId) or authentication.isEmployed or authentication.Admin")
     public ResponseEntity<?> addReceivers(
             @RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Podaci o primaocu",
@@ -75,7 +75,8 @@ public class ReceiverController {
             )
     })
     @GetMapping("/{customerId}")
-    @ReceiverAuthorization
+//    @ReceiverAuthorization
+    @PreAuthorize("@accountSecurity.isAccountOwner(accountId, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
     public ResponseEntity<?> getReceivers(
             @Parameter(description = "ID korisnika", required = true, example = "2")
             @PathVariable Long customerId) {
@@ -101,7 +102,8 @@ public class ReceiverController {
             )
     })
     @PutMapping("/{receiverId}")
-    @ReceiverAuthorization
+//    @ReceiverAuthorization
+    @PreAuthorize(" @receiverSecurity.isReceiverOf(#id, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
     public ResponseEntity<?> updateReceiver(
             @Parameter(description = "ID primaoca", required = true, example = "1")
             @PathVariable Long receiverId,
@@ -134,7 +136,8 @@ public class ReceiverController {
             )
     })
     @DeleteMapping("/{id}")
-    @ReceiverAuthorization
+//    @ReceiverAuthorization
+    @PreAuthorize(" @receiverSecurity.isReceiverOf(#id, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
     public ResponseEntity<?> deleteReceiver(
             @Parameter(description = "ID primaoca", required = true, example = "1")
             @PathVariable("id") Long receiverId) {
