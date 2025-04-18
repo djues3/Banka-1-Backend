@@ -44,7 +44,7 @@ public class ReceiverController {
     })
     @PostMapping
 //    @ReceiverAuthorization
-    @PreAuthorize("@accountSecurity.isAccountOwner(receiverDTO.ownerAccountId, authentication.userId) or authentication.isEmployed or authentication.Admin")
+    @PreAuthorize("@accountSecurity.isAccountOwner(receiverDTO.customerId, authentication.userId) or authentication.isEmployed or authentication.Admin")
     public ResponseEntity<?> addReceivers(
             @RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Podaci o primaocu",
@@ -76,7 +76,7 @@ public class ReceiverController {
     })
     @GetMapping("/{customerId}")
 //    @ReceiverAuthorization
-    @PreAuthorize("@accountSecurity.isAccountOwner(accountId, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
+    @PreAuthorize("authentication.id == #customerId or authentication.isEmployed or authentication.isAdmin")
     public ResponseEntity<?> getReceivers(
             @Parameter(description = "ID korisnika", required = true, example = "2")
             @PathVariable Long customerId) {
@@ -103,7 +103,7 @@ public class ReceiverController {
     })
     @PutMapping("/{receiverId}")
 //    @ReceiverAuthorization
-    @PreAuthorize(" @receiverSecurity.isReceiverOf(#id, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
+    @PreAuthorize(" @receiverSecurity.isReceiverOf(#receiverId, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
     public ResponseEntity<?> updateReceiver(
             @Parameter(description = "ID primaoca", required = true, example = "1")
             @PathVariable Long receiverId,
@@ -137,7 +137,7 @@ public class ReceiverController {
     })
     @DeleteMapping("/{id}")
 //    @ReceiverAuthorization
-    @PreAuthorize(" @receiverSecurity.isReceiverOf(#id, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
+    @PreAuthorize(" @receiverSecurity.isReceiverOf(#receiverId, authentication.userId) or authentication.isEmployed or authentication.isAdmin")
     public ResponseEntity<?> deleteReceiver(
             @Parameter(description = "ID primaoca", required = true, example = "1")
             @PathVariable("id") Long receiverId) {

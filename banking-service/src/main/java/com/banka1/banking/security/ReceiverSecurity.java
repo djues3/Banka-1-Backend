@@ -25,8 +25,7 @@ public class ReceiverSecurity {
     public boolean isReceiverOf(Long receiverId, Long userId) {
         if (receiverId == null || userId == null) return false;
         try {
-            Receiver receiver = receiverService.findById(receiverId);
-            return accountSecurity.isAccountOwner(receiver.getOwnerAccountId(), userId);
+            return receiverService.findById(receiverId).getCustomerId().equals(userId);
         } catch (Exception e) {
             return false;
         }

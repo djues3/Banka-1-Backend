@@ -276,10 +276,7 @@ public class SecurityConfig {
     Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper() {
         return (context) -> {
             OidcUserInfoAuthenticationToken authentication = context.getAuthentication();
-            JwtAuthenticationToken principal =
-                    (JwtAuthenticationToken) authentication.getPrincipal();
-
-            return new OidcUserInfo(authentication.getToken().getClaims());
+            return authentication.getUserInfo();
         };
     }
 
