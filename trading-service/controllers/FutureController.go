@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"banka1.com/middlewares"
 	"errors"
 	"time"
 
@@ -224,8 +225,10 @@ func (fc *FutureController) GetFutureHistoryRange(c *fiber.Ctx) error {
 func InitFutureRoutes(app *fiber.App) {
 	futureController := NewFutureController()
 
-	app.Get("/future", futureController.GetAllFutures)
-	app.Get("/future/:ticker", futureController.GetFutureByTicker)
-	app.Get("/future/:ticker/history", futureController.GetFutureHistoryRange)
-	app.Get("/future/:ticker/history/:date", futureController.GetFutureHistoryByDate)
+	futureGroup := app.Group("/future", middlewares.CacheMiddleware(5*time.Minute))
+
+	futureGroup.Get("", futureController.GetAllFutures)
+	futureGroup.Get("/:ticker", futureController.GetFutureByTicker)
+	futureGroup.Get("/:ticker/history", futureController.GetFutureHistoryRange)
+	futureGroup.Get("/:ticker/history/:date", futureController.GetFutureHistoryByDate)
 }

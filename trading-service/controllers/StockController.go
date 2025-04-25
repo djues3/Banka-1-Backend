@@ -3,6 +3,7 @@ package controllers
 import (
 	"banka1.com/db"
 	"banka1.com/listings/finhub"
+	"banka1.com/middlewares"
 	"banka1.com/types"
 	"github.com/gofiber/fiber/v2"
 	"time"
@@ -258,9 +259,11 @@ func (sc *StockController) GetStockHistoryRange(c *fiber.Ctx) error {
 func InitStockRoutes(app *fiber.App) {
 	StockController := NewStockController()
 
-	app.Get("/stocks", StockController.GetAllStocks)
-	app.Get("/stocks/:ticker", StockController.GetStockByTicker)
-	app.Get("/stocks/:ticker/history/first", StockController.GetStockFirstHistory)
-	app.Get("/stocks/:ticker/history/:date", StockController.GetStockHistoryByDate)
-	app.Get("/stocks/:ticker/history", StockController.GetStockHistoryRange)
+	stockGroup := app.Group("/stocks", middlewares.CacheMiddleware(5*time.Minute))
+
+	stockGroup.Get("/", StockController.GetAllStocks)
+	stockGroup.Get("/:ticker", StockController.GetStockByTicker)
+	stockGroup.Get("/:ticker/history/first", StockController.GetStockFirstHistory)
+	stockGroup.Get("/:ticker/history/:date", StockController.GetStockHistoryByDate)
+	stockGroup.Get("/:ticker/history", StockController.GetStockHistoryRange)
 }

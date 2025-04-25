@@ -2,6 +2,7 @@ package main
 
 import (
 	"banka1.com/cron"
+	"banka1.com/redis"
 	"banka1.com/routes"
 	fiberSwagger "github.com/swaggo/fiber-swagger"
 
@@ -40,6 +41,18 @@ func main() {
 
 	broker.Connect(os.Getenv("MESSAGE_BROKER_NETWORK"), os.Getenv("MESSAGE_BROKER_HOST"))
 	db.Init()
+	redisConfig := redis.Config{
+
+		Addr:     os.Getenv("REDIS_ADDR"),     // e.g., "localhost:6379"
+		Password: os.Getenv("REDIS_PASSWORD"), // can be empty
+		DB:       0,                           // default DB
+		PoolSize: 10,                          // connection pool size
+	}
+
+	if err := redis.Init(redisConfig); err != nil {
+		log.Fatalf("Failed to initialize Redis: %v", err)
+	}
+	defer redis.Close()
 
 	cron.StartScheduler()
 
