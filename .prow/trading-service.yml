@@ -61,7 +61,7 @@ presubmits:
               # Promeniti ovu komandu da pokreće one servise koji vam trebaju za vaše
               # testove. Moguće je više puta pokrenuti "docker compose up" za različite
               # Docker Compose servise.
-              docker compose up -d trading-db message-broker user-service banking-service
+              docker compose up -d trading-db message-broker user-service banking-service redis
               
               SERVICE_NAME="trading-service"
               cd trading-service
