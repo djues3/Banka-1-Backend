@@ -56,6 +56,7 @@ public class TaxServiceTest {
 
         userAccount.setBalance(200.0);
         bankAccount.setBalance(100.0);
+        bankAccount.setCurrencyType(CurrencyType.USD);
 
         Transfer transfer = new Transfer();
         transfer.setAmount(100.0);
@@ -65,11 +66,7 @@ public class TaxServiceTest {
         transfer.setFromCurrency(usd);
 
         when(accountRepository.findById(dto.getAccountId())).thenReturn(Optional.of(userAccount));
-        when(bankAccountUtils.getBankAccountForCurrency(CurrencyType.RSD)).thenReturn(bankAccount);
-        when(exchangeService.calculatePreviewExchangeAutomatic(any(), any(), any())).thenReturn(Map.of(
-                "fee", 0.0,
-                "finalAmount", 100.0
-        ));
+        when(bankAccountUtils.getBankAccountForCurrency(CurrencyType.USD)).thenReturn(bankAccount);
         when(transferService.createMoneyTransferEntity(any(), any(), any())).thenReturn(transfer);
 
         taxService.payTax(dto);

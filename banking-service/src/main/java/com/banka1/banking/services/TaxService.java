@@ -5,7 +5,6 @@ import com.banka1.banking.dto.TaxCollectionDTO;
 import com.banka1.banking.models.Account;
 import com.banka1.banking.models.Transaction;
 import com.banka1.banking.models.Transfer;
-import com.banka1.banking.models.helper.CurrencyType;
 import com.banka1.banking.models.helper.TransferStatus;
 import com.banka1.banking.repository.AccountRepository;
 import com.banka1.banking.repository.TransactionRepository;
@@ -37,7 +36,7 @@ public class TaxService {
         if(account.getBalance() < dto.getAmount())
             throw new RuntimeException("Nedovoljno sredstava");
 
-        Account bankAccount = bankAccountUtils.getBankAccountForCurrency(CurrencyType.RSD);
+        Account bankAccount = bankAccountUtils.getBankAccountForCurrency(account.getCurrencyType());
 
         account.setBalance(account.getBalance() - dto.getAmount());
         Map<String, Object> exchangeMap = null;
@@ -59,7 +58,7 @@ public class TaxService {
                 moneyTransferDTO
         );
 
-        if(account.getCurrencyType() == CurrencyType.RSD)
+        if(account.getCurrencyType() == bankAccount.getCurrencyType())
             bankAccount.setBalance(bankAccount.getBalance() + dto.getAmount());
         else {
             exchangeMap = exchangeService.calculatePreviewExchangeAutomatic(account.getCurrencyType().toString(), "RSD", dto.getAmount());
@@ -75,7 +74,7 @@ public class TaxService {
         debitTransaction.setAmount(dto.getAmount());
         debitTransaction.setCurrency(transfer.getFromCurrency());
         debitTransaction.setFee(0.0);
-        debitTransaction.setBankOnly(true);
+        debitTransaction.setBankOnly(false);
 
         if(exchangeMap != null) {
             log.info(exchangeMap.toString());
