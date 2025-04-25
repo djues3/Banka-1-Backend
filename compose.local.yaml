@@ -238,6 +238,14 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
       LANG: en_US.utf8
       LC_ALL: en_US.utf8
+  redis:
+    image: 'redis:latest'
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+    networks:
+      - proxy-net
 networks:
   broker-net: null
   notification-net: null
