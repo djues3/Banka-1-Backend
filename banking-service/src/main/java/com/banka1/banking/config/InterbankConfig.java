@@ -15,4 +15,13 @@ public class InterbankConfig {
 
     @Value("${INTERBANK_TARGET_URL}")
     private String interbankTargetUrl;
+
+    @Value("${API_KEY}")
+    private String apiKey;
+
+    @Value("${FOREIGN_BANK_API_KEY}")
+    private String foreignBankApiKey;
+
+    @Value("${TRADING_SERVICE_URL}")
+    private String tradingServiceUrl;
 }

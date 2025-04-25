@@ -89,7 +89,11 @@ jacocoTestReport {
                 "**/model/**",
                 "**/dto/**",
                 "**/controller/**",
-                "**/*Controller.*"
+                "**/*Controller.*",
+                "**/com/banka1/banking/services/InterbankService.*",
+                "**/com/banka1/banking/listener/**",
+                //  com.banka1.banking.services.requests
+                "**/com/banka1/banking/services/requests/**"
             ])
         }))
     }

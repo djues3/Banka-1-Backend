@@ -327,6 +327,7 @@ func executePartial(order1 *types.Order, price float64, tx *gorm.DB) int {
 					SellerID:     getSellerID(*order1, match),
 					SecurityID:   order1.SecurityID,
 					Quantity:     currentMatchQty,
+					TaxPaid:      false,
 					PricePerUnit: price,
 					TotalPrice:   price * float64(currentMatchQty),
 				}
@@ -481,6 +482,7 @@ func executePartial(order1 *types.Order, price float64, tx *gorm.DB) int {
 					SecurityID:   order.SecurityID,
 					Quantity:     matchQty,
 					PricePerUnit: price,
+					TaxPaid:      false,
 					TotalPrice:   price * float64(matchQty),
 				}
 				if err := tx.Debug().Create(&txn).Error; err != nil {

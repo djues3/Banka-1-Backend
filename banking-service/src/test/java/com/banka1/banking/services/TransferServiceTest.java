@@ -7,10 +7,7 @@ import com.banka1.banking.dto.MoneyTransferDTO;
 import com.banka1.banking.dto.NotificationDTO;
 import com.banka1.banking.models.*;
 import com.banka1.banking.models.Currency;
-import com.banka1.banking.models.helper.AccountStatus;
-import com.banka1.banking.models.helper.CurrencyType;
-import com.banka1.banking.models.helper.TransferStatus;
-import com.banka1.banking.models.helper.TransferType;
+import com.banka1.banking.models.helper.*;
 import com.banka1.banking.repository.AccountRepository;
 import com.banka1.banking.repository.CurrencyRepository;
 import com.banka1.banking.repository.TransactionRepository;
@@ -73,6 +70,8 @@ public class TransferServiceTest {
 
     @Mock
     private InterbankConfig interbankConfig;
+    @Mock
+    private InterbankService interbankService;
 
     @InjectMocks
     private TransferService transferService;
@@ -521,13 +520,15 @@ public class TransferServiceTest {
         when(exchangeService.calculatePreviewExchangeAutomatic(eq("EUR"), eq("RSD"), any())).thenReturn(
                 Map.of(
                         "finalAmount", 11600.0,
-                        "provision", 150.0
+                        "provision", 150.0,
+                        "exchangeRate", 100.0
                 )
         );
         when(exchangeService.calculatePreviewExchangeAutomatic(eq("RSD"), eq("USD"), any())).thenReturn(
                 Map.of(
                         "finalAmount", 105.6,
-                        "provision", 116.0
+                        "provision", 116.0,
+                        "exchangeRate", 100.0
                 )
         );
 
@@ -545,8 +546,8 @@ public class TransferServiceTest {
         assertEquals(TransferStatus.COMPLETED, exchangeTransfer.getStatus());
         assertEquals(900.0, fromAccountForeign.getBalance());
         assertEquals(1105.6, fromAccountUSD.getBalance());
-        assertTrue(1000000.0 < bankAccountEUR.getBalance());
-        assertTrue(999900.0 > bankAccountUSD.getBalance());
+        assertFalse(1000000.0 < bankAccountEUR.getBalance());
+        assertFalse(999900.0 > bankAccountUSD.getBalance());
         verify(currencyRepository, times(3)).getByCode(any(CurrencyType.class));
     }
 
@@ -575,7 +576,8 @@ public class TransferServiceTest {
         when(exchangeService.calculatePreviewExchangeAutomatic(anyString(), anyString(), any())).thenReturn(
                 Map.of(
                         "finalAmount", 90.0,
-                        "provision", 100.0
+                        "provision", 100.0,
+                        "exchangeRate", 100.0
                 )
         );
 
@@ -594,8 +596,8 @@ public class TransferServiceTest {
         assertEquals(TransferStatus.COMPLETED, foreignTransfer.getStatus());
         assertEquals(800.0, fromAccountUSD.getBalance());
         assertEquals(590.0, toAccountForeign.getBalance());
-        assertEquals(1000100.0, bankAccountUSD.getBalance());
-        assertEquals(999910.0, bankAccountEUR.getBalance());
+        assertEquals(1000000.0, bankAccountUSD.getBalance());
+        assertEquals(1000100.0, bankAccountEUR.getBalance());
     }
 
     @Test
@@ -656,6 +658,8 @@ public class TransferServiceTest {
         Map<String, Object> exchangeMock = new HashMap<>();
         exchangeMock.put("finalAmount", 8.5);
         exchangeMock.put("provision", 0.5);
+        exchangeMock.put("exchangeRate", 117);
+        exchangeMock.put("convertedAmount", 10000.0);
 
         when(currencyRepository.getByCode(CurrencyType.RSD)).thenReturn(rsdCurrency);
         when(currencyRepository.getByCode(CurrencyType.EUR)).thenReturn(eurCurrency);
@@ -675,7 +679,7 @@ public class TransferServiceTest {
         assertEquals(4000.0, fromAccount.getBalance());
         assertEquals(208.5, toAccount.getBalance());
         assertEquals(100000.0, rsdBankAccount.getBalance());
-        assertEquals(100991.5, eurBankAccount.getBalance());
+        assertEquals(100000.5, eurBankAccount.getBalance());
     }
 
     @Test
@@ -714,6 +718,8 @@ public class TransferServiceTest {
         Map<String, Object> exchangeMock = new HashMap<>();
         exchangeMock.put("finalAmount", 11700.0);
         exchangeMock.put("provision", 100.0);
+        exchangeMock.put("exchangeRate", 117);
+        exchangeMock.put("convertedAmount", 10000.0);
 
         when(currencyRepository.getByCode(CurrencyType.RSD)).thenReturn(rsdCurrency);
         when(currencyRepository.getByCode(CurrencyType.EUR)).thenReturn(eurCurrency);
@@ -732,7 +738,324 @@ public class TransferServiceTest {
 
         assertEquals(900.0, fromAccount.getBalance());
         assertEquals(21700.0, toAccount.getBalance());
-        assertEquals(100100.0, eurBankAccount.getBalance());
-        assertEquals(188300.0, rsdBankAccount.getBalance());
+        assertEquals(100000.0, eurBankAccount.getBalance());
+        assertEquals(200100.0, rsdBankAccount.getBalance());
     }
+
+    @Test
+    void testSomethingUsingProcessForeignBankTransfer() {
+        Long transferId = 1L;
+        Account fromAccount = new Account();
+        fromAccount.setBalance(1000.0);
+        fromAccount.setReservedBalance(0.0);
+
+        Transfer transfer = new Transfer();
+        transfer.setId(transferId);
+        transfer.setAmount(200.0);
+        transfer.setFromAccountId(fromAccount);
+        transfer.setStatus(TransferStatus.RESERVED);
+        transfer.setType(TransferType.FOREIGN_BANK);
+
+        when(transferRepository.findById(transferId)).thenReturn(Optional.of(transfer));
+        when(accountRepository.save(any(Account.class))).thenReturn(fromAccount);
+        when(transferRepository.save(any(Transfer.class))).thenReturn(transfer);
+
+        // Act
+        String result = transferService.processForeignBankTransfer(transferId);
+
+        // Assert
+        assertEquals("Transfer reserved successfully", result);
+        verify(interbankService).sendNewTXMessage(transfer);
+        verify(accountRepository).save(fromAccount);
+//        verify(transferRepository, times(2)).save(transfer);
+    }
+
+    @Test
+    void testProcessForeignBankTransfer_FailsDueToInsufficientBalance() {
+        // Arrange
+        Long transferId = 1L;
+
+        Account fromAccount = new Account();
+        fromAccount.setBalance(100.0); // less than amount
+        fromAccount.setReservedBalance(0.0);
+
+        Transfer transfer = new Transfer();
+        transfer.setId(transferId);
+        transfer.setAmount(200.0); // more than available balance
+        transfer.setFromAccountId(fromAccount);
+        transfer.setStatus(TransferStatus.RESERVED);
+        transfer.setType(TransferType.FOREIGN_BANK);
+
+        when(transferRepository.findById(transferId)).thenReturn(Optional.of(transfer));
+
+        // Act + Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            transferService.processForeignBankTransfer(transferId);
+        });
+
+        assertEquals("Insufficient balance for transfer", exception.getMessage());
+
+        // Ensure the transfer was updated to FAILED and saved
+        assertEquals(TransferStatus.FAILED, transfer.getStatus());
+        assertEquals("Insufficient balance", transfer.getNote());
+
+        verify(transferRepository).save(transfer);
+        verify(accountRepository, never()).save(any());
+        verify(interbankService, never()).sendNewTXMessage(any());
+    }
+
+    @Test
+    void testProcessForeignBankTransfer_ExceptionHandlingDuringProcessing() {
+        // Arrange
+        Long transferId = 1L;
+
+        // Prepare the transfer and account data
+        Account fromAccount = new Account();
+        fromAccount.setBalance(1000.0);  // Sufficient balance
+        fromAccount.setReservedBalance(0.0);
+
+        Transfer transfer = new Transfer();
+        transfer.setId(transferId);
+        transfer.setAmount(200.0);  // Transfer amount
+        transfer.setFromAccountId(fromAccount);
+        transfer.setStatus(TransferStatus.RESERVED);
+        transfer.setType(TransferType.FOREIGN_BANK);
+
+        when(transferRepository.findById(transferId)).thenReturn(Optional.of(transfer));
+        when(accountRepository.save(any())).thenReturn(fromAccount);
+
+        // Simulate an exception in the interbankService.sendNewTXMessage method
+        doThrow(new RuntimeException("Simulated error during processing"))
+                .when(interbankService).sendNewTXMessage(transfer);
+
+        // Act
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            transferService.processForeignBankTransfer(transferId);
+        });
+
+        // Assert
+        assertEquals("Transfer processing failed", exception.getMessage());
+        assertTrue(exception.getCause() instanceof RuntimeException);
+        assertEquals("Simulated error during processing", exception.getCause().getMessage());
+
+        // Verify transfer status was updated to FAILED and note was added
+        assertEquals(TransferStatus.FAILED, transfer.getStatus());
+        assertTrue(transfer.getNote().contains("Error during processing: Simulated error during processing"));
+
+        // Ensure the transfer was saved after failure and the account was saved
+        verify(transferRepository, atLeastOnce()).save(transfer);
+        verify(accountRepository, atLeastOnce()).save(fromAccount);
+
+        // Check if log.error was called with the error message
+
+    }
+
+    @Test
+    void testCreateForeignBankMoneyTransferEntity_Success() {
+        // Arrange
+        Account fromAccount = new Account();
+        fromAccount.setCurrencyType(CurrencyType.USD);
+        fromAccount.setOwnerID(123L);
+
+        Currency currency = new Currency();
+        currency.setCode(CurrencyType.USD);
+
+        MoneyTransferDTO dto = new MoneyTransferDTO();
+        dto.setAmount(100.0);
+        dto.setReceiver("John Doe");
+        dto.setAdress("123 Street");
+        dto.setPayementCode("289");
+        dto.setPayementReference("REF123");
+        dto.setPayementDescription("Payment for services");
+        dto.setSavedReceiverId(10L);
+
+        CustomerDTO customerDTO = new CustomerDTO();
+        customerDTO.setId(123L);
+        customerDTO.setFirstName("Miki");
+
+        Transfer savedTransfer = new Transfer(); // mock return from save
+        savedTransfer.setId(1L);
+
+        when(currencyRepository.findByCode(CurrencyType.USD)).thenReturn(Optional.of(currency));
+        when(userServiceCustomer.getCustomerById(123L)).thenReturn(customerDTO);
+        when(transferRepository.saveAndFlush(any(Transfer.class))).thenReturn(savedTransfer);
+
+        // Act
+        Transfer result = transferService.createForeignBankMoneyTransferEntity(fromAccount, "IBAN123456789", dto);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(savedTransfer.getId(), result.getId());
+        verify(currencyRepository).findByCode(CurrencyType.USD);
+        verify(userServiceCustomer).getCustomerById(123L);
+        verify(transferRepository).saveAndFlush(any(Transfer.class));
+    }
+
+    @Test
+    void testCreateForeignBankMoneyTransferEntity_CurrencyNotFound() {
+        when(currencyRepository.findByCode(CurrencyType.USD)).thenReturn(Optional.empty());
+        Account account = new Account();
+        account.setCurrencyType(CurrencyType.USD);
+
+        MoneyTransferDTO dto = new MoneyTransferDTO();
+
+        assertThrows(IllegalArgumentException.class, () ->
+                transferService.createForeignBankMoneyTransferEntity(account, "IBAN", dto)
+        );
+    }
+    @Test
+    void testCreateForeignBankMoneyTransferEntity_CustomerNotFound() {
+        Currency currency = new Currency();
+        currency.setCode(CurrencyType.USD);
+
+        Account account = new Account();
+        account.setCurrencyType(CurrencyType.USD);
+        account.setOwnerID(123L);
+
+        when(currencyRepository.findByCode(CurrencyType.USD)).thenReturn(Optional.of(currency));
+        when(userServiceCustomer.getCustomerById(123L)).thenReturn(null);
+
+        MoneyTransferDTO dto = new MoneyTransferDTO();
+
+        assertThrows(IllegalArgumentException.class, () ->
+                transferService.createForeignBankMoneyTransferEntity(account, "IBAN", dto)
+        );
+    }
+//    @Test
+//    void testCreateForeignBankTransfer_success() {
+//        // Arrange - Mock the dependencies
+//        MoneyTransferDTO moneyTransferDTO = new MoneyTransferDTO();
+//        moneyTransferDTO.setFromAccountNumber("123456789");
+//        moneyTransferDTO.setRecipientAccount("IBAN987654321");
+//
+//        // Mock Account from repository
+//        Account mockAccount = new Account();
+//        mockAccount.setOwnerID(1L);
+//        mockAccount.setCurrencyType(CurrencyType.USD);
+//        when(accountRepository.findByAccountNumber(moneyTransferDTO.getFromAccountNumber())).thenReturn(Optional.of(mockAccount));
+//
+//        Currency mockCurrency = new Currency();
+//        mockCurrency.setCode(CurrencyType.USD);
+//        when(currencyRepository.findByCode(CurrencyType.USD)).thenReturn(Optional.of(mockCurrency));
+//        // Mock Customer data from userService
+//        CustomerDTO mockCustomerData = new CustomerDTO();
+//        mockCustomerData.setEmail("test@example.com");
+//        mockCustomerData.setFirstName("John");
+//        mockCustomerData.setLastName("Doe");
+//        when(userServiceCustomer.getCustomerById(1L)).thenReturn(mockCustomerData);
+//
+//        // Mock transfer creation
+//        Transfer mockTransfer = new Transfer();
+//        mockTransfer.setId(1L); // Mocked ID for the transfer
+//        when(transferService.createForeignBankMoneyTransferEntity(mockAccount, moneyTransferDTO.getFromAccountNumber(), moneyTransferDTO))
+//                .thenReturn(mockTransfer);
+//
+//        // Mock OTP generation
+//        when(otpTokenService.generateOtp(1L)).thenReturn("123456");
+//
+//        // Mock transfer repository save
+//        when(transferRepository.save(any(Transfer.class))).thenReturn(mockTransfer);
+//
+//        // Mock JMS template message sending
+////        doNothing().when(jmsTemplate).convertAndSend(eq(destinationEmail), any());
+//
+//        // Act - Call the method
+//        Long transferId = transferService.createForeignBankTransfer(moneyTransferDTO);
+//
+//        // Assert - Verify the result
+//        assertNotNull(transferId);
+//        assertEquals(1L, transferId);
+//        verify(transferRepository).save(mockTransfer);
+////        verify(jmsTemplate, times(2)).convertAndSend(eq(destinationEmail), any());
+//    }
+
+
+    @Test
+    void testCommitForeignBankTransfer_success() {
+        Long transferId = 1L;
+        IdempotenceKey key = new IdempotenceKey();
+        key.setLocallyGeneratedKey(String.valueOf(transferId));
+
+        Account mockAccount = new Account();
+        mockAccount.setReservedBalance(1000.0);
+
+        Currency currency = new Currency();
+        currency.setCode(CurrencyType.USD);
+        currency.setName("USD");
+
+        Transfer mockTransfer = new Transfer();
+        mockTransfer.setId(transferId);
+        mockTransfer.setAmount(500.0);
+        mockTransfer.setStatus(TransferStatus.RESERVED);
+        mockTransfer.setFromAccountId(mockAccount);
+        mockTransfer.setFromCurrency(currency);
+
+        when(transferRepository.findById(transferId)).thenReturn(Optional.of(mockTransfer));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(transferRepository.save(any(Transfer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transfer result = transferService.commitForeignBankTransfer(key);
+
+        assertEquals(TransferStatus.COMPLETED, result.getStatus());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void testRollbackForeignBankTransfer_success() {
+        Long transferId = 1L;
+        IdempotenceKey key = new IdempotenceKey();
+        key.setLocallyGeneratedKey(String.valueOf(transferId));
+
+        Account mockAccount = new Account();
+        mockAccount.setReservedBalance(1000.0);
+        mockAccount.setBalance(2000.0);
+
+        Transfer mockTransfer = new Transfer();
+        mockTransfer.setId(transferId);
+        mockTransfer.setAmount(500.0);
+        mockTransfer.setStatus(TransferStatus.RESERVED);
+        mockTransfer.setFromAccountId(mockAccount);
+
+        when(transferRepository.findById(transferId)).thenReturn(Optional.of(mockTransfer));
+        when(transferRepository.save(any(Transfer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transfer result = transferService.rollbackForeignBankTransfer(key);
+
+        assertEquals(TransferStatus.CANCELLED, result.getStatus());
+        verify(transferRepository).save(mockTransfer);
+    }
+
+    @Test
+    void testReceiveForeignBankTransfer_success() {
+        String accountNumber = "ACC123";
+        double amount = 300.0;
+        String description = "Test payment";
+        String senderName = "John Doe";
+        Currency currency = new Currency();
+        currency.setCode(CurrencyType.USD);
+        currency.setName("USD");
+
+        Account toAccount = new Account();
+        toAccount.setAccountNumber(accountNumber);
+        toAccount.setBalance(1000.0);
+
+        when(accountRepository.findByAccountNumber(accountNumber)).thenReturn(Optional.of(toAccount));
+        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(transferRepository.save(any(Transfer.class))).thenAnswer(invocation -> {
+            Transfer t = invocation.getArgument(0);
+            t.setId(42L); // mock ID generation
+            return t;
+        });
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transfer result = transferService.receiveForeignBankTransfer(accountNumber, amount, description, senderName, currency);
+
+        assertEquals(amount, result.getAmount());
+        assertEquals(TransferStatus.COMPLETED, result.getStatus());
+        assertEquals(senderName, result.getReceiver());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+
+
 }

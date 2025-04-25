@@ -52,21 +52,7 @@ public class CardMapper {
         authorizedPerson.setFirstName(dto.getFirstName());
         authorizedPerson.setLastName(dto.getLastName());
         authorizedPerson.setPhoneNumber(dto.getPhoneNumber());
-        if (dto.getBirthday() != null) {
-            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
-            Date date = null;
-            try {
-                date = sdf.parse(dto.getBirthday());
-            } catch (ParseException e) {
-                throw new RuntimeException(e);
-            }
-
-            long timeInMillis = date.getTime();
-            authorizedPerson.setBirthDate(timeInMillis);
-
-        } else {
-            authorizedPerson.setBirthDate(dto.getBirthDate());
-        }
+        authorizedPerson.setBirthDate(dto.getBirthDate());
 
         return authorizedPerson;
     }

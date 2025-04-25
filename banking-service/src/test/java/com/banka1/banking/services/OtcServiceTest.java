@@ -256,4 +256,57 @@ public class OtcServiceTest {
 
         verify(accountRepository, never()).save(any());
     }
+
+
+    @Test
+    public void testProceed_FinishedStage_Success() {
+        Account seller = new Account();
+        seller.setId(1L);
+        seller.setBalance(200.0);
+        seller.setCurrencyType(CurrencyType.valueOf("USD"));
+
+        Account buyer = new Account();
+        buyer.setId(2L);
+        buyer.setBalance(300.0);
+        buyer.setCurrencyType(CurrencyType.valueOf("USD"));
+
+        transaction.setAmount(100.0);
+        transaction.setBuyerAccount(buyer);
+        transaction.setSellerAccount(seller);
+        transaction.setFinished(true);
+        transaction.getSellerAccount().setOwnerID(1L);
+
+        CustomerDTO mockedCustomer = new CustomerDTO();
+        mockedCustomer.setFirstName("John");
+        mockedCustomer.setLastName("Doe");
+        mockedCustomer.setAddress("123 Fake Street");
+
+        Currency fromCurrency = new Currency();
+        fromCurrency.setCode(CurrencyType.USD);
+
+        Currency toCurrency = new Currency();
+        toCurrency.setCode(CurrencyType.USD);
+
+
+
+        // Mock the userServiceCustomer.getCustomerById to return the mocked customer
+        when(userServiceCustomer.getCustomerById(anyLong())).thenReturn(mockedCustomer);
+        when(otcTransactionRepository.findByUid(uid)).thenReturn(Optional.of(transaction));
+//        when(userServiceCustomer.getCustomerById(any(Long.class))).thenReturn(new CustomerDTO());
+
+
+        otcService.proceed(uid);
+
+        assertEquals(300.0, buyer.getBalance()); // Balance should not change since transaction is finished
+
+    }
+
+
+
+
+
+
+
+
+
 }

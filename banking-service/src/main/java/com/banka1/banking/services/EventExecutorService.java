@@ -1,5 +1,6 @@
 package com.banka1.banking.services;
 
+import com.banka1.banking.config.InterbankConfig;
 import com.banka1.banking.dto.CreateEventDeliveryDTO;
 import com.banka1.banking.dto.interbank.InterbankMessageDTO;
 import com.banka1.banking.dto.interbank.InterbankMessageType;
@@ -37,15 +38,18 @@ public class EventExecutorService {
 
     private final EventService eventService;
     private final InterbankOperationService interbankService;
+    private final InterbankConfig config;
 
     private final TaskScheduler taskScheduler = new ConcurrentTaskScheduler();
 
     private static final int MAX_RETRIES = 5;
     private static final Duration RETRY_DELAY = Duration.ofSeconds(20);
 
-    public EventExecutorService(EventService eventService, @Lazy InterbankOperationService interbankService) {
+    public EventExecutorService(EventService eventService, @Lazy InterbankOperationService interbankService,
+                                 InterbankConfig config) {
         this.eventService = eventService;
         this.interbankService = interbankService;
+        this.config = config;
     }
 
     @Async
@@ -76,7 +80,7 @@ public class EventExecutorService {
         Instant start = Instant.now();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
-        headers.set("X-Api-Key", ":DDDDDDDDDDDDDDDD");
+        headers.set("X-Api-Key", config.getForeignBankApiKey());
 
         HttpEntity<String> entity = new HttpEntity<>(event.getPayload(), headers);
 

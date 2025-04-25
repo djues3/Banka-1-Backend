@@ -15,8 +15,7 @@ public class DtoTest {
         // Test AuthorizedPersonDTO
         AuthorizedPersonDTO authorizedPersonDTO = new AuthorizedPersonDTO();
         authorizedPersonDTO.setFirstName("John");
-        authorizedPersonDTO.setLastName("Doe");
-        authorizedPersonDTO.setBirthDate(123L); // 2000-01-01
+        authorizedPersonDTO.setLastName("Doe");        authorizedPersonDTO.setBirthDate("2000-01-01"); // 2000-01-01
         authorizedPersonDTO.setPhoneNumber("+1234567890");
         authorizedPersonDTO.setCompanyID(123L);
 
@@ -25,7 +24,7 @@ public class DtoTest {
         AuthorizedPersonDTO sameAuthorizedPerson = new AuthorizedPersonDTO();
         sameAuthorizedPerson.setFirstName("John");
         sameAuthorizedPerson.setLastName("Doe");
-        sameAuthorizedPerson.setBirthDate(123L);
+        sameAuthorizedPerson.setBirthDate("2000-01-01");
         sameAuthorizedPerson.setPhoneNumber("+1234567890");
         sameAuthorizedPerson.setCompanyID(123L);
         

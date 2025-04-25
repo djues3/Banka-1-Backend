@@ -149,6 +149,11 @@ public class OTCService {
                 bankTransaction.setDate(dateStr);
                 bankTransaction.setTime(timeStr);
 
+                String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                String timeStr = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+                bankTransaction.setDate(dateStr);
+                bankTransaction.setTime(timeStr);
+
                 transactionRepository.save(bankTransaction);
 
                 otcTransactionRepository.delete(transaction);

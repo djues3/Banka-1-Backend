@@ -263,7 +263,7 @@ public class ExchangeService {
         double amountInTargetCurrency = remainingRSD * secondExchangeRate;
         double secondFee = amountInTargetCurrency * 0.01;
         double finalAmount = amountInTargetCurrency - secondFee;
-        double totalFee = firstFee + secondFee;
+        double totalFee = firstFee * secondExchangeRate + secondFee;
 
         // Prikazujemo obrnut kurs za prikaz klijentu
         double displayedSecondExchangeRate = 1 / secondExchangeRate;

@@ -265,7 +265,7 @@ func (oc *OrderController) CreateOrder(c *fiber.Ctx) error {
 			case "AGENT":
 				var actuary types.Actuary
 				if err := db.DB.Where("user_id = ?", orderRequest.UserID).First(&actuary).Error; err == nil {
-					estimatedUsage := float64(orderRequest.Quantity) * security.LastPrice * 0.3 * 1.1
+					estimatedUsage := float64(orderRequest.Quantity) * security.LastPrice
 					if actuary.UsedLimit+estimatedUsage <= actuary.LimitAmount {
 						status = "approved"
 					} else {

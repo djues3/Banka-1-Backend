@@ -7,7 +7,7 @@ import lombok.Setter;
 public class AuthorizedPersonDTO {
     private String firstName;
     private String lastName;
-    private Long birthDate;
+    private String birthDate;
     private String phoneNumber;
     private Long companyID;
     private String email;

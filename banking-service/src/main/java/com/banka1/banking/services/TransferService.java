@@ -157,6 +157,7 @@ public class TransferService {
         );
         Double firstExchangedAmount = (Double) firstExchange.get("finalAmount");
         Double firstExchangeProvision = (Double) firstExchange.get("provision");
+        Double firstExchangeRate = (Double) firstExchange.get("exchangeRate");
 
         Map<String, Object> secondExchange = exchangeService.calculatePreviewExchangeAutomatic(
                 "RSD",
@@ -165,15 +166,16 @@ public class TransferService {
         );
         Double secondExchangedAmount = (Double) secondExchange.get("finalAmount");
         Double secondExchangeProvision = (Double) secondExchange.get("provision");
+        Double secondExchangeTotalFee = (Double) secondExchange.get("totalFee");
 
         //skidamo korisniku EUR
         fromAccount.setBalance(fromAccount.getBalance() - transfer.getAmount());
         // i stavljamo direktno na racun banke za tu valutu
-        fromCurrencyBankAccount.setBalance(fromCurrencyBankAccount.getBalance() + transfer.getAmount());
+        fromCurrencyBankAccount.setBalance(fromCurrencyBankAccount.getBalance());
         // dodajemo konvertovanu svotu iz evra na racun dinara
         rsdBankAccount.setBalance(rsdBankAccount.getBalance() + firstExchangeProvision);
         //balance  - total + provision (finalAmount)
-        toCurrencyBankAccount.setBalance(toCurrencyBankAccount.getBalance() - secondExchangedAmount);
+        toCurrencyBankAccount.setBalance(toCurrencyBankAccount.getBalance() + secondExchangeProvision);
         //dodajemo pare na devizni racun korisnika
         toAccount.setBalance(toAccount.getBalance() + secondExchangedAmount);
 
@@ -194,26 +196,26 @@ public class TransferService {
                 true,
                 fromCurrencyBankAccount,
                 rsdBankAccount,
-                firstExchangeProvision,
+                transfer.getAmount() * firstExchangeRate ,
                 rsd,
                 0.0,
                 "Provision: Foreign to RSD",
                 transfer
         );
 
-        //from RSD bank account -> foreign currency
-//        Transaction thirdTransaction = createTransaction(
-//                true,
-//                rsdBankAccount,
-//                toCurrencyBankAccount,
-//                secondExchangedAmount + secondExchangeProvision,
-//                toCurrency,
-//                0.0,
-//                "Provision: Foreign to RSD",
-//                transfer
-//        );
-
-        //from foreign bank account -> to account
+//        from RSD bank account -> foreign currency
+        Transaction thirdTransaction = createTransaction(
+                true,
+                rsdBankAccount,
+                toCurrencyBankAccount,
+                firstExchangedAmount,
+                rsd,
+                0.0,
+                "Provision: Foreign to RSD",
+                transfer
+        );
+//         1% ostaje, 99 ide na korisnika
+//        from foreign bank account -> to account
         Transaction fourthTransaction = createTransaction(
                 true,
                 toCurrencyBankAccount,
@@ -226,11 +228,14 @@ public class TransferService {
         );
 
 
-        Set<Transaction> transactions = new HashSet<>(List.of(firstTransaction, secondTransaction, fourthTransaction));
+        Set<Transaction> transactions = new HashSet<>(List.of(firstTransaction, secondTransaction, thirdTransaction, fourthTransaction));
         transactionRepository.saveAll(transactions);
         transferRepository.save(transfer);
 
-        return secondExchange;
+
+        return exchangeService.calculatePreviewExchangeAutomatic(fromAccount.getCurrencyType().toString(),
+                toAccount.getCurrencyType().toString(),
+                transfer.getAmount());
     }
 
     /**
@@ -258,10 +263,11 @@ public class TransferService {
 
         Double finalAmount = (Double) exchange.get("finalAmount");
         Double provision = (Double) exchange.get("provision");
+        Double convertedAmount = (Double) exchange.get("convertedAmount");
+
 
         fromAccount.setBalance(fromAccount.getBalance() - amount);
-        rsdBankAccount.setBalance(rsdBankAccount.getBalance() + amount);
-        foreignBankAccount.setBalance(foreignBankAccount.getBalance() - finalAmount);
+        foreignBankAccount.setBalance(foreignBankAccount.getBalance() + provision);
         toAccount.setBalance(toAccount.getBalance() + finalAmount);
 
         Transfer transferToBank = createTransfer(
@@ -297,20 +303,31 @@ public class TransferService {
                 transferToBank
         );
 
+        Transaction transactionRsdToForeign = createTransaction(
+                true,
+                rsdBankAccount,
+                foreignBankAccount,
+                convertedAmount,
+                toCurrency,
+                0.0,
+                "Exchange transaction",
+                transferToBank
+        );
+
         Transaction transactionFromBank = createTransaction(
                 true,
                 foreignBankAccount,
                 toAccount,
                 finalAmount,
                 toCurrency,
-                provision,
+                0.0,
                 "Exchange transaction",
                 transferFromBank
         );
 
         saveTransfersAndTransactions(
                 List.of(transferToBank, transferFromBank),
-                List.of(transactionToBank, transactionFromBank),
+                List.of(transactionToBank, transactionRsdToForeign, transactionFromBank),
                 List.of(rsdBankAccount, foreignBankAccount)
         );
 
@@ -340,6 +357,7 @@ public class TransferService {
 
         Double finalAmount = (Double) exchange.get("finalAmount");
         Double provision = (Double) exchange.get("provision");
+        Double convertedAmount = (Double) exchange.get("convertedAmount");
 
         CustomerDTO receiver = userServiceCustomer.getCustomerById(toAccount.getOwnerID());
 
@@ -347,8 +365,7 @@ public class TransferService {
         Account foreignBankAccount = bankAccountUtils.getBankAccountForCurrency(fromAccount.getCurrencyType());
 
         fromAccount.setBalance(fromAccount.getBalance() - amount);
-        foreignBankAccount.setBalance(foreignBankAccount.getBalance() + amount);
-        rsdBankAccount.setBalance(rsdBankAccount.getBalance() - finalAmount);
+        rsdBankAccount.setBalance(rsdBankAccount.getBalance() + provision);
         toAccount.setBalance(toAccount.getBalance() + finalAmount);
 
         Transfer transferToBank = createTransfer(
@@ -379,7 +396,17 @@ public class TransferService {
                 foreignBankAccount,
                 amount,
                 fromCurrency,
-                provision,
+                0.0,
+                "Exchange transaction",
+                transferToBank
+        );
+        Transaction transactionForeignToRsd = createTransaction(
+                true,
+                foreignBankAccount,
+                rsdBankAccount,
+                convertedAmount,
+                rsd,
+                0.0,
                 "Exchange transaction",
                 transferToBank
         );
@@ -397,7 +424,7 @@ public class TransferService {
 
         saveTransfersAndTransactions(
                 List.of(transferToBank, transferFromBank),
-                List.of(transactionToBank, transactionFromBank),
+                List.of(transactionToBank, transactionForeignToRsd, transactionFromBank),
                 List.of(rsdBankAccount, foreignBankAccount)
         );
 
@@ -1176,6 +1203,8 @@ public class TransferService {
 
         return transfer;
     }
+
+    
 
 }
 

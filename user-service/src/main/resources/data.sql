@@ -96,10 +96,10 @@ VALUES (1, 'Marko', 'Marković', 'marko.markovic@banka.com', 'okram',
 
 -- Permissions for Marko
 INSERT INTO customer_permissions (customer_id, permission)
-VALUES (1, 'READ_EMPLOYEE');
-
-INSERT INTO customer_permissions (customer_id, permission)
-VALUES (1, 'OTC_TRADING');
+SELECT 1
+     , unnest(ARRAY [
+    'READ_EMPLOYEE', 'OTC_TRADING'
+    ]);
 
 -- Customer 2: Anastasija password: Anastas12345
 INSERT INTO customer (id, first_name, last_name, email, username, phone_number,

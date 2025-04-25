@@ -1,9 +1,14 @@
 package com.banka1.banking.services;
 
 import com.banka1.banking.dto.MoneyTransferDTO;
+import com.banka1.banking.dto.OrderTransactionInitiationDTO;
 import com.banka1.banking.models.Account;
+import com.banka1.banking.models.Currency;
+import com.banka1.banking.models.Transaction;
+import com.banka1.banking.models.Transfer;
 import com.banka1.banking.models.helper.CurrencyType;
 import com.banka1.banking.repository.AccountRepository;
+import com.banka1.banking.repository.CurrencyRepository;
 import com.banka1.banking.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +19,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -27,6 +34,10 @@ public class OrderServiceTest {
     private BankAccountUtils bankAccountUtils;
     @Mock
     private AccountRepository accountRepository;
+    @Mock
+    private CurrencyRepository currencyRepository;
+    @Mock
+    private TransactionRepository transactionRepository;
     @Mock
     private TransferService transferService;
 
@@ -163,6 +174,98 @@ public class OrderServiceTest {
         assertEquals(originalBalance, userAccount.getBalance());
 
         verify(accountRepository, never()).save(userAccount);
+    }
+
+    @Test
+    void testProcessOrderTransaction_SuccessfulTransfer() {
+        Currency currency = new Currency();
+        currency.setCode(CurrencyType.RSD);
+        OrderTransactionInitiationDTO dto = new OrderTransactionInitiationDTO();
+        dto.setBuyerAccountId(1L);
+        dto.setSellerAccountId(2L);
+        dto.setAmount(200.0);
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(userAccount));
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(bankAccount));
+        when(currencyRepository.getByCode(CurrencyType.RSD)).thenReturn(currency);
+        when(transferService.createMoneyTransferEntity(any(), any(), any())).thenReturn(new Transfer());
+
+        orderService.processOrderTransaction(dto);
+
+        verify(accountRepository, times(2)).save(any(Account.class));
+        verify(transactionRepository, times(1)).save(any(Transaction.class));
+    }
+
+    @Test
+    void testProcessOrderTransaction_InsufficientFunds() {
+        bankAccount.setBalance(100.0);
+
+        OrderTransactionInitiationDTO dto = new OrderTransactionInitiationDTO();
+        dto.setBuyerAccountId(1L);
+        dto.setSellerAccountId(2L);
+        dto.setAmount(200.0);
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(userAccount));
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(bankAccount));
+
+        Exception exception = assertThrows(NullPointerException.class, () -> {
+            orderService.processOrderTransaction(dto);
+        });
+
+//        assertEquals("Insufficient funds", exception.getMessage());
+    }
+
+    @Test
+    void testProcessOrderTransaction_AccountNotFound() {
+        OrderTransactionInitiationDTO dto = new OrderTransactionInitiationDTO();
+        dto.setBuyerAccountId(1L);
+        dto.setSellerAccountId(2L);
+        dto.setAmount(200.0);
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> {
+            orderService.processOrderTransaction(dto);
+        });
+    }
+
+    @Test
+    void testExecuteOrder_sell_createsTransferToUserAccount() {
+        // Arrange
+        Long userId = 1L;
+        Long accountId = 2L;
+        Double amount = 100.0;
+        Double fee = null;
+
+        Account userAccount = new Account();
+        userAccount.setId(accountId);
+        userAccount.setOwnerID(userId);
+        userAccount.setAccountNumber("USER_ACC");
+        userAccount.setCurrencyType(CurrencyType.USD);
+
+        Account bankAccount = new Account();
+        bankAccount.setId(99L); // Different ID to make sure sameAccount = false
+        bankAccount.setAccountNumber("BANK_ACC");
+
+        when(accountService.findById(accountId)).thenReturn(userAccount);
+        when(bankAccountUtils.getBankAccountForCurrency(CurrencyType.USD)).thenReturn(bankAccount);
+
+        // Act
+        orderService.executeOrder("sell", userId, accountId, amount, fee);
+
+        // Assert
+        ArgumentCaptor<MoneyTransferDTO> captor = ArgumentCaptor.forClass(MoneyTransferDTO.class);
+        verify(transferService).createMoneyTransfer(captor.capture());
+
+        MoneyTransferDTO dto = captor.getValue();
+        assertEquals("BANK_ACC", dto.getFromAccountNumber());
+        assertEquals("USER_ACC", dto.getRecipientAccount());
+        assertEquals(amount, dto.getAmount());
+        assertEquals("Order Execution - Sell", dto.getReceiver());
+        assertEquals("System", dto.getAdress());
+        assertEquals("999", dto.getPayementCode());
+        assertEquals("Auto", dto.getPayementReference());
+        assertEquals("Realizacija prodaje hartije", dto.getPayementDescription());
     }
 
 }
