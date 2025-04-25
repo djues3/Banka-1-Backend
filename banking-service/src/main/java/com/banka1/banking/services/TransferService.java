@@ -660,6 +660,7 @@ public class TransferService {
 
             return "Transfer completed successfully";
         }catch (Exception e) {
+            log.error("Error processing transfer:", e);
             throw new RuntimeException("Transaction failed, rollback initiated", e);
         }
 

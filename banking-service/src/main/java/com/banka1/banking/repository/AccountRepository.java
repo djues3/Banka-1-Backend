@@ -19,7 +19,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     boolean existsByAccountNumber(@NotBlank @Size(min = 2, max = 30) String accountNumber);
     boolean existsByOwnerIDAndCurrencyType(Long ownerId,CurrencyType currencyType);
 
-    Optional<Account> findByTypeAndCurrencyType(AccountType accountType,CurrencyType currencyType);
+    Optional<Account> findFirstByTypeAndCurrencyType(AccountType accountType, CurrencyType currencyType);
     Optional<Account> findByAccountNumber(String accountNumber);
     Account findByOwnerIDAndCurrencyType(Long ownerId, CurrencyType currencyType);
     List<Account> findByCompanyId(Long companyId);

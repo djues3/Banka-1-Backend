@@ -218,20 +218,35 @@ func CreateInitialSellOrdersFromBank() {
 			if err == nil {
 				continue
 			}
+			var order types.Order
+			if sec.Type == "Forex" {
+				order = types.Order{
+					UserID:         BankUserId,
+					AccountID:      1000000000,
+					SecurityID:     sec.ID,
+					Direction:      "sell",
+					OrderType:      ot,
+					Quantity:       InitialQuantity,
+					RemainingParts: ptr(InitialQuantity),
+					Status:         "approved",
+					IsDone:         false,
+					LastModified:   time.Now().Unix(),
+				}
+			} else {
 
-			order := types.Order{
-				UserID:         BankUserId,
-				AccountID:      bankAccountId,
-				SecurityID:     sec.ID,
-				Direction:      "sell",
-				OrderType:      ot,
-				Quantity:       InitialQuantity,
-				RemainingParts: ptr(InitialQuantity),
-				Status:         "approved",
-				IsDone:         false,
-				LastModified:   time.Now().Unix(),
+				order = types.Order{
+					UserID:         BankUserId,
+					AccountID:      bankAccountId,
+					SecurityID:     sec.ID,
+					Direction:      "sell",
+					OrderType:      ot,
+					Quantity:       InitialQuantity,
+					RemainingParts: ptr(InitialQuantity),
+					Status:         "approved",
+					IsDone:         false,
+					LastModified:   time.Now().Unix(),
+				}
 			}
-
 			switch ot {
 			case "LIMIT":
 				order.LimitPricePerUnit = &limit
