@@ -1,5 +1,7 @@
 package dto
 
+import "encoding/json"
+
 type InterbankOtcOfferDTO struct {
 	Stock          StockDescription `json:"stock"`
 	SettlementDate string           `json:"settlementDate"`
@@ -64,4 +66,77 @@ type OptionContractDTO struct {
 	RemoteRoutingNumber *int    `json:"remoteRoutingNumber,omitempty"`
 	RemoteBuyerID       *string `json:"remoteBuyerId,omitempty"`
 	RemoteSellerID      *string `json:"remoteSellerId,omitempty"`
+}
+
+type InterbankMessageDTO[T any] struct {
+	IdempotenceKey IdempotenceKeyDTO `json:"idempotenceKey"`
+	MessageType    string            `json:"messageType"`
+	Message        T                 `json:"message"`
+}
+
+type PostingDTO struct {
+	Account TxAccountDTO `json:"account"`
+	Amount  float64      `json:"amount"`
+	Asset   AssetDTO     `json:"asset"`
+}
+
+type TxAccountDTO struct {
+	Type string            `json:"type"`
+	Id   *ForeignBankIdDTO `json:"id,omitempty"`
+	Num  *string           `json:"num,omitempty"`
+}
+
+type ForeignBankIdDTO struct {
+	RoutingNumber int    `json:"routingNumber"`
+	UserId        string `json:"id"`
+}
+
+type VoteDTO struct {
+	Vote    string          `json:"vote"`
+	Reasons []VoteReasonDTO `json:"reasons,omitempty"`
+}
+type VoteReasonDTO struct {
+	Reason  string      `json:"reason"`
+	Posting *PostingDTO `json:"posting,omitempty"`
+}
+type IdempotenceKeyDTO struct {
+	RoutingNumber       int    `json:"routingNumber"`
+	LocallyGeneratedKey string `json:"locallyGeneratedKey"`
+}
+
+type AssetDTO struct {
+	Type  string          `json:"type"`
+	Asset json.RawMessage `json:"asset"`
+}
+
+type MonetaryAssetDTO struct {
+	Currency string `json:"currency"`
+}
+
+type StockDescriptionDTO struct {
+	Ticker string `json:"ticker"`
+}
+
+type OptionDescriptionDTO struct {
+	ID             ForeignBankIdDTO    `json:"id"`
+	Stock          StockDescriptionDTO `json:"stock"`
+	PricePerUnit   MonetaryValueDTO    `json:"pricePerUnit"`
+	SettlementDate string              `json:"settlementDate"`
+	Amount         int                 `json:"amount"`
+	NegotiationID  *ForeignBankIdDTO   `json:"negotiationId,omitempty"`
+}
+
+type MonetaryValueDTO struct {
+	Currency string  `json:"currency"`
+	Amount   float64 `json:"amount"`
+}
+
+type InterbankTransactionDTO struct {
+	Postings      []PostingDTO     `json:"postings"`
+	Message       string           `json:"message"`
+	TransactionId ForeignBankIdDTO `json:"transactionId"`
+}
+
+type CommitTransactionDTO struct {
+	TransactionId ForeignBankIdDTO `json:"transactionId"`
 }

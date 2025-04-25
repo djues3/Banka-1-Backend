@@ -13,8 +13,11 @@ import (
 	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/log"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -262,14 +265,14 @@ func (c *OTCTradeController) CounterOfferOTCTrade(ctx *fiber.Ctx) error {
 			JSON(types.Response{Success: false, Data: "", Error: "Niste učesnik ove međubankarske ponude"})
 	}
 	//STAVLJENO OVDE SAMO RADI TESTIRANJA,ODKOMENTARISATI ISPOD NA PRAVOM MESTU I OBRISATI OVO KADA SVE BUDE GOTOVO
-	modifiedBy := fmt.Sprintf("%d%s", myRouting, localUserIDStr)
-	trade.Quantity = req.Quantity
-	trade.PricePerUnit = req.PricePerUnit
-	trade.Premium = req.Premium
-	trade.SettlementAt = settlementDate
-	trade.LastModified = time.Now().Unix()
-	trade.ModifiedBy = modifiedBy
-	trade.Status = "pending"
+	//modifiedBy := fmt.Sprintf("%d%s", myRouting, localUserIDStr)
+	//trade.Quantity = req.Quantity
+	//trade.PricePerUnit = req.PricePerUnit
+	//trade.Premium = req.Premium
+	//trade.SettlementAt = settlementDate
+	//trade.LastModified = time.Now().Unix()
+	//trade.ModifiedBy = modifiedBy
+	//trade.Status = "pending"
 
 	if err := db.DB.Save(&trade).Error; err != nil {
 		return ctx.Status(500).
@@ -319,18 +322,18 @@ func (c *OTCTradeController) CounterOfferOTCTrade(ctx *fiber.Ctx) error {
 			JSON(types.Response{Success: false, Data: "", Error: fmt.Sprintf("Bank4: %s", string(respBody))})
 	}
 
-	//trade.Quantity = req.Quantity
-	//trade.PricePerUnit = req.PricePerUnit
-	//trade.Premium = req.Premium
-	//trade.SettlementAt = settlementDate
-	//trade.LastModified = time.Now().Unix()
-	//trade.ModifiedBy = localUserIDStr
-	//trade.Status = "pending"
-	//
-	//if err := db.DB.Save(&trade).Error; err != nil {
-	//	return ctx.Status(500).
-	//		JSON(types.Response{Success: false, Data: "", Error: "Greška pri čuvanju međubankarske kontraponude"})
-	//}
+	trade.Quantity = req.Quantity
+	trade.PricePerUnit = req.PricePerUnit
+	trade.Premium = req.Premium
+	trade.SettlementAt = settlementDate
+	trade.LastModified = time.Now().Unix()
+	trade.ModifiedBy = localUserIDStr
+	trade.Status = "pending"
+
+	if err := db.DB.Save(&trade).Error; err != nil {
+		return ctx.Status(500).
+			JSON(types.Response{Success: false, Data: "", Error: "Greška pri čuvanju međubankarske kontraponude"})
+	}
 
 	return ctx.Status(fiber.StatusOK).
 		JSON(types.Response{Success: true, Data: fmt.Sprintf("Interbank kontraponuda poslata za međubankarski negotioationID: %d", trade.RemoteNegotiationID), Error: ""})
@@ -600,6 +603,23 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 
 }
 
+func parsePrefixedID(prefixed string) (uint, error) {
+	if len(prefixed) <= 3 {
+		return 0, fmt.Errorf("invalid prefixed id: %q", prefixed)
+	}
+	idStr := prefixed[3:]
+	id64, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("cannot parse user part %q: %w", idStr, err)
+	}
+	return uint(id64), nil
+}
+
+func toRaw(v interface{}) json.RawMessage {
+	b, _ := json.Marshal(v)
+	return json.RawMessage(b)
+}
+
 func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 	id := ctx.Params("id")
 	userID := uint(ctx.Locals("user_id").(float64))
@@ -610,6 +630,116 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 			Success: false,
 			Error:   "Ugovor nije pronađen",
 		})
+	}
+
+	if contract.RemoteContractID != nil {
+		ourRouting := 111
+		optID := *contract.RemoteContractID
+		negID := *contract.RemoteNegotiationID
+		qty := contract.Quantity
+		strike := contract.StrikePrice
+		settleAt := contract.SettlementAt.Format(time.RFC3339)
+
+		idemp := dto.IdempotenceKeyDTO{
+			RoutingNumber:       ourRouting,
+			LocallyGeneratedKey: fmt.Sprintf("newtx-%d", time.Now().Unix()),
+		}
+
+		makePosting := func(amount float64, user string) dto.PostingDTO {
+			optDesc := dto.OptionDescriptionDTO{
+				ID:             dto.ForeignBankIdDTO{RoutingNumber: ourRouting, UserId: negID},
+				Stock:          dto.StockDescriptionDTO{Ticker: contract.Ticker},
+				PricePerUnit:   dto.MonetaryValueDTO{Currency: "USD", Amount: strike},
+				SettlementDate: settleAt,
+				Amount:         qty,
+			}
+			return dto.PostingDTO{
+				Account: dto.TxAccountDTO{
+					Type: "OPTION",
+					Id: &dto.ForeignBankIdDTO{
+						RoutingNumber: 111,
+						UserId:        user,
+					},
+				},
+				Amount: amount,
+				Asset: dto.AssetDTO{
+					Type:  "OPTION",
+					Asset: toRaw(optDesc),
+				},
+			}
+		}
+
+		seller := *contract.RemoteSellerID
+		buyer := *contract.RemoteBuyerID
+
+		interbankMsg := dto.InterbankMessageDTO[dto.InterbankTransactionDTO]{
+			IdempotenceKey: idemp,
+			MessageType:    "NEW_TX",
+			Message: dto.InterbankTransactionDTO{
+				Postings:      []dto.PostingDTO{makePosting(-float64(qty), seller), makePosting(+float64(qty), buyer)},
+				Message:       fmt.Sprintf("Rezervacija %d %s hartija pod %s", qty, contract.Ticker, optID),
+				TransactionId: dto.ForeignBankIdDTO{RoutingNumber: ourRouting, UserId: idemp.LocallyGeneratedKey},
+			},
+		}
+
+		body, err := json.Marshal(interbankMsg)
+		fmt.Println(body)
+		if err != nil {
+			return ctx.Status(500).JSON(types.Response{false, "", "Greška pri serijalizaciji interbank poruke"})
+		}
+		url := os.Getenv("BANKING_SERVICE_URL") + "/interbank/internal"
+		req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		//req.Header.Set("X-Api-Key", os.Getenv("INTERBANK_INCOMING_API_KEY"))
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return ctx.Status(502).JSON(types.Response{false, "", "Greška pri slanju poruke bankingu"})
+		}
+		defer resp.Body.Close()
+
+		//type InterbankTxnRecord struct {
+		//	ID            uint      `gorm:"primaryKey"`
+		//	RoutingNumber int       `gorm:"not null;index"`
+		//	TransactionId string    `gorm:"not null;uniqueIndex:idx_txn"`
+		//	UserID        uint      `gorm:"not null"`
+		//	SecurityID    uint      `gorm:"not null"`
+		//	Quantity      int       `gorm:"not null"`
+		//	NeedsCredit   bool      `gorm:"not null;default:false"`
+		//	State         string    `gorm:"not null"`
+		//	CreatedAt     time.Time `gorm:"autoCreateTime"`
+		//}
+
+		ticker := contract.Ticker
+		var sec types.Security
+		if err := db.DB.
+			Where("ticker = ?", ticker).
+			First(&sec).Error; err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+				Success: false,
+				Error:   fmt.Sprintf("Security '%s' nije pronađen", ticker),
+			})
+		}
+		rec := types.InterbankTxnRecord{
+			RoutingNumber: 111,
+			TransactionId: idemp.LocallyGeneratedKey,
+			UserID:        userID,
+			SecurityID:    sec.ID,
+			Quantity:      contract.Quantity,
+			PurchasePrice: &contract.StrikePrice,
+			NeedsCredit:   true,
+			State:         "PREPARED",
+		}
+		if err := db.DB.Create(&rec).Error; err != nil {
+			log.Errorf("Ne mogu da snimim interbank tx record: %v", err)
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			b, _ := io.ReadAll(resp.Body)
+			return ctx.Status(resp.StatusCode).JSON(types.Response{false, "", fmt.Sprintf("Banking servis: %s", string(b))})
+		}
+
+		return ctx.JSON(types.Response{true, "Međubankarski ugovor prosleđen bankingu", ""})
 	}
 
 	if contract.BuyerID == nil || *contract.BuyerID != userID {
@@ -1422,6 +1552,205 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 	})
 }
 
+type interbankRaw struct {
+	IdempotenceKey dto.IdempotenceKeyDTO `json:"idempotenceKey"`
+	MessageType    string                `json:"messageType"`
+	Message        json.RawMessage       `json:"message"`
+}
+
+func (c *OTCTradeController) HandleInterbankTX(ctx *fiber.Ctx) error {
+	var raw interbankRaw
+	if err := ctx.BodyParser(&raw); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).
+			JSON(fiber.Map{"success": false, "error": "Nevalidan JSON"})
+	}
+
+	switch raw.MessageType {
+	case "NEW_TX":
+		var msg dto.InterbankTransactionDTO
+		if err := json.Unmarshal(raw.Message, &msg); err != nil {
+			return ctx.Status(fiber.StatusBadRequest).
+				JSON(fiber.Map{"success": false, "error": "Nevalidan NEW_TX payload"})
+		}
+		vote := c.handleNewTX(raw.IdempotenceKey, msg)
+		return ctx.JSON(vote)
+
+	case "COMMIT_TX":
+		var msg dto.CommitTransactionDTO
+		if err := json.Unmarshal(raw.Message, &msg); err != nil {
+			return ctx.Status(fiber.StatusBadRequest).
+				JSON(fiber.Map{"success": false, "error": "Nevalidan COMMIT_TX payload"})
+		}
+		vote := c.handleCommitTX(raw.IdempotenceKey, msg)
+		return ctx.JSON(vote)
+
+	default:
+		return ctx.Status(fiber.StatusBadRequest).
+			JSON(fiber.Map{"success": false, "error": "Nepoznat messageType"})
+	}
+}
+
+func (c *OTCTradeController) handleNewTX(
+	key dto.IdempotenceKeyDTO,
+	tx dto.InterbankTransactionDTO,
+) dto.VoteDTO {
+	//if len(tx.Postings) != 2 {
+	//	return dto.VoteDTO{
+	//		Vote: "NO",
+	//		Reasons: []dto.VoteReasonDTO{{
+	//			Reason:  "UNBALANCED_TX",
+	//			Posting: nil,
+	//		}},
+	//	}
+	//}
+
+	var sellerPosting *dto.PostingDTO
+	for i := range tx.Postings {
+		p := &tx.Postings[i]
+		if p.Asset.Type != "STOCK" {
+			return dto.VoteDTO{Vote: "YES"}
+		}
+		if p.Amount < 0 {
+			sellerPosting = p
+			break
+		}
+	}
+	if sellerPosting == nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "UNBALANCED_TX", Posting: &tx.Postings[0]}},
+		}
+	}
+
+	fb := sellerPosting.Account.Id
+	userID, err := strconv.ParseUint(fb.UserId, 10, 64)
+	if err != nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "NO_SUCH_ACCOUNT", Posting: sellerPosting}},
+		}
+	}
+
+	var stockDesc dto.StockDescriptionDTO
+	if err := json.Unmarshal(sellerPosting.Asset.Asset, &stockDesc); err != nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "NO_SUCH_ASSET", Posting: sellerPosting}},
+		}
+	}
+
+	var sec types.Security
+	if err := db.DB.Where("ticker = ?", stockDesc.Ticker).First(&sec).Error; err != nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "NO_SUCH_ASSET", Posting: sellerPosting}},
+		}
+	}
+
+	var port types.Portfolio
+	if err := db.DB.
+		Where("user_id = ? AND security_id = ?", userID, sec.ID).
+		First(&port).Error; err != nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "NO_SUCH_ACCOUNT", Posting: sellerPosting}},
+		}
+	}
+
+	need := int(math.Abs(sellerPosting.Amount))
+	if port.PublicCount < need {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "INSUFFICIENT_ASSET", Posting: sellerPosting}},
+		}
+	}
+
+	rec := types.InterbankTxnRecord{
+		RoutingNumber: key.RoutingNumber,
+		TransactionId: tx.TransactionId.UserId,
+		UserID:        uint(userID),
+		SecurityID:    sec.ID,
+		Quantity:      need,
+		NeedsCredit:   false,
+		State:         "PREPARED",
+	}
+	if err := db.DB.Create(&rec).Error; err != nil {
+		log.Errorf("Ne mogu da snimim interbank tx record: %v", err)
+	}
+
+	return dto.VoteDTO{Vote: "YES"}
+}
+
+func (c *OTCTradeController) handleCommitTX(
+	key dto.IdempotenceKeyDTO,
+	commit dto.CommitTransactionDTO,
+) dto.VoteDTO {
+	fmt.Println(key)
+	var rec types.InterbankTxnRecord
+	if err := db.DB.
+		Where("transaction_id = ?", commit.TransactionId.UserId).
+		First(&rec).Error; err != nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "NO_SUCH_TX", Posting: nil}},
+		}
+	}
+
+	if rec.State == "COMMITTED" {
+		return dto.VoteDTO{Vote: "YES"}
+	}
+
+	var port types.Portfolio
+	err := db.DB.
+		Where("user_id = ? AND security_id = ?", rec.UserID, rec.SecurityID).
+		First(&port).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		port = types.Portfolio{
+			UserID:      rec.UserID,
+			SecurityID:  rec.SecurityID,
+			Quantity:    0,
+			PublicCount: 0,
+		}
+		if err := db.DB.Create(&port).Error; err != nil {
+			return dto.VoteDTO{
+				Vote:    "NO",
+				Reasons: []dto.VoteReasonDTO{{Reason: "UNABLE_TO_COMMIT", Posting: nil}},
+			}
+		}
+	} else if err != nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "UNABLE_TO_COMMIT", Posting: nil}},
+		}
+	}
+
+	if rec.NeedsCredit {
+		port.Quantity += rec.Quantity
+	} else {
+		if port.PublicCount < rec.Quantity {
+			return dto.VoteDTO{
+				Vote:    "NO",
+				Reasons: []dto.VoteReasonDTO{{Reason: "INSUFFICIENT_ASSET", Posting: nil}},
+			}
+		}
+		port.PublicCount -= rec.Quantity
+	}
+
+	if err := db.DB.Save(&port).Error; err != nil {
+		return dto.VoteDTO{
+			Vote:    "NO",
+			Reasons: []dto.VoteReasonDTO{{Reason: "UNABLE_TO_COMMIT", Posting: nil}},
+		}
+	}
+
+	rec.State = "COMMITTED"
+	if err := db.DB.Save(&rec).Error; err != nil {
+		log.Errorf("Ne mogu da ažuriram InterbankTxnRecord: %v", err)
+	}
+
+	return dto.VoteDTO{Vote: "YES"}
+}
+
 func InitOTCTradeRoutes(app *fiber.App) {
 	app.Get("/public-stock", middlewares.RequireInterbankApiKey, GetPublicStocks)
 	otcController := NewOTCTradeController()
@@ -1439,5 +1768,7 @@ func InitOTCTradeRoutes(app *fiber.App) {
 	app.Put("/negotiations/:routingNumber/:id", middlewares.RequireInterbankApiKey, otcController.CounterInterbankNegotiation)
 	app.Delete("/negotiations/:routingNumber/:id", middlewares.RequireInterbankApiKey, otcController.CloseInterbankNegotiation)
 	app.Get("/negotiations/:routingNumber/:id/accept", middlewares.RequireInterbankApiKey, otcController.AcceptInterbankNegotiation)
+
+	app.Post("/interbank/internal", otcController.HandleInterbankTX)
 
 }
