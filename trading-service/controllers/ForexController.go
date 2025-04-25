@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"banka1.com/middlewares"
 	"errors"
 	"time"
 
@@ -233,8 +234,10 @@ func (fc *ForexController) GetForexHistoryByDate(c *fiber.Ctx) error {
 func InitForexRoutes(app *fiber.App) {
 	forexController := NewForexController()
 
-	app.Get("/forex", forexController.GetAllForex)
-	app.Get("/forex/:base/:quote", forexController.GetForexByPair)
-	app.Get("/forex/:base/:quote/history", forexController.GetForexHistoryRange)
-	app.Get("/forex/:base/:quote/history/:date", forexController.GetForexHistoryByDate)
+	forexGroup := app.Group("/forex", middlewares.CacheMiddleware(5*time.Minute))
+
+	forexGroup.Get("", forexController.GetAllForex)
+	forexGroup.Get("/:base/:quote", forexController.GetForexByPair)
+	forexGroup.Get("/:base/:quote/history", forexController.GetForexHistoryRange)
+	forexGroup.Get("/:base/:quote/history/:date", forexController.GetForexHistoryByDate)
 }

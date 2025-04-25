@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"banka1.com/db"
+	"banka1.com/middlewares"
 	"banka1.com/types"
 	"errors"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 	"strconv"
+	"time"
 )
 
 type ExchangeController struct {
@@ -177,8 +179,10 @@ func (ec *ExchangeController) GetExchangeByAcronym(c *fiber.Ctx) error {
 func InitExchangeRoutes(app *fiber.App) {
 	ec := NewExchangeController()
 
-	app.Get("/exchanges", ec.GetAllExchanges)
-	app.Get("/exchanges/:id", ec.GetExchangeByID)
-	app.Get("/exchanges/mic/:micCode", ec.GetExchangeByMIC)
-	app.Get("/exchanges/acronym/:acronym", ec.GetExchangeByAcronym)
+	exchangeGroup := app.Group("/exchanges", middlewares.CacheMiddleware(12*time.Hour))
+
+	exchangeGroup.Get("", ec.GetAllExchanges)
+	exchangeGroup.Get("/:id", ec.GetExchangeByID)
+	exchangeGroup.Get("/mic/:micCode", ec.GetExchangeByMIC)
+	exchangeGroup.Get("/acronym/:acronym", ec.GetExchangeByAcronym)
 }
