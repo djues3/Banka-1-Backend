@@ -33,6 +33,7 @@ func NewTaxController() *TaxController {
 //	@Failure		500	{object}	types.Response								"Greška pri čitanju rezultata iz baze"
 //	@Router			/tax [get]
 func (tc *TaxController) GetTaxForAllUsers(c *fiber.Ctx) error {
+	/*
 	rows, err := db.DB.Raw(`WITH max_created_at AS (SELECT user_id, MAX(created_at) AS c FROM tax GROUP BY user_id)
 SELECT user_id, taxable_profit, tax_amount, is_paid, actuary.id IS NOT NULL
 FROM tax LEFT JOIN actuary USING (user_id)
@@ -45,8 +46,24 @@ AND NOT is_paid;`).Rows()
 			Success: false,
 			Error:   "Neuspeo zahtev: " + err.Error(),
 		})
-	}
+	}*/
+
 	responses := make([]types.TaxResponse, 0)
+	var transactions []types.Transaction
+
+	query := "SELECT * FROM transactions WHERE total_price > 0"
+
+	err := db.DB.Raw(query).Scan(&transactions).Error
+
+	if err != nil {
+		log.Printf("Error fetching transactions: %v", err)
+		return c.Status(500).JSON(types.Response{
+			Success: false,
+			Error:   "Error fetching transactions: " + err.Error(),
+		})
+	}
+
+	/*
 	for rows.Next() {
 		var response types.TaxResponse
 		err := rows.Scan(&response.UserID, &response.TaxableProfit, &response.TaxAmount, &response.IsPaid, &response.IsActuary)
@@ -57,7 +74,53 @@ AND NOT is_paid;`).Rows()
 			})
 		}
 		responses = append(responses, response)
+	}*/
+
+	for _, transaction := range transactions {
+		profit := transaction.TotalPrice
+		tax := profit * 0.15
+
+		var userId uint = 0
+		if transaction.OrderID != 0 {
+			// order
+			var order types.Order
+			if err := db.DB.First(&order, transaction.OrderID).Error; err != nil {
+				continue
+			}
+
+			userId = order.UserID
+		} else {
+			// otc
+			var contract types.OptionContract
+			if err := db.DB.First(&contract, transaction.ContractID).Error; err != nil {
+				continue
+			}
+
+			userId = *contract.SellerID
+		}
+
+		if userId == 0 {
+			continue
+		}
+
+		var isActuary bool
+		db.DB.Raw(`
+			SELECT COUNT(*) > 0
+			FROM actuary
+			WHERE user_id = ?
+		`, userId).Scan(&isActuary)
+
+		response := types.TaxResponse{
+			UserID:        userId,
+			TaxableProfit: profit,
+			TaxAmount:     tax,
+			IsPaid:        transaction.TaxPaid,
+			IsActuary:     isActuary,
+		}
+
+		responses = append(responses, response)
 	}
+
 	return c.JSON(types.Response{
 		Success: true,
 		Data:    responses,
@@ -222,12 +285,27 @@ func (tc *TaxController) GetAggregatedTaxForUser(c *fiber.Ctx) error {
 	year := time.Now().Format("2006")
 	yearMonth := time.Now().Format("2006-01")
 
-	var paid float64
+	var yearTransactions []types.Transaction
+	var monthTransactions []types.Transaction
+
+	queryYearMonth := "SELECT * FROM transactions WHERE total_price > 0 AND tax_paid = FALSE"
+
+	if os.Getenv("DB_TYPE") == "POSTGRES_DSN" {
+		queryYearMonth += " AND TO_CHAR(created_at, 'YYYY-MM') = ?"
+	} else {
+		queryYearMonth += " AND substr(created_at, 1, 7) = ?"
+	}
+
+	var paid float64 = 0.0
+	/*
 	err = db.DB.Raw(`
 		SELECT COALESCE(SUM(tax_amount), 0)
 		FROM tax
 		WHERE is_paid = TRUE AND user_id = ? AND substr(month_year, 1, 4) = ?
 	`, userID, year).Scan(&paid).Error
+	*/
+
+	err = db.DB.Raw(queryYearMonth, yearMonth).Scan(&monthTransactions).Error
 
 	if err != nil {
 		log.Printf("OVDE PUCA!!!_-------------------------------------")
@@ -238,12 +316,25 @@ func (tc *TaxController) GetAggregatedTaxForUser(c *fiber.Ctx) error {
 		})
 	}
 
-	var unpaid float64
+	queryYear := "SELECT * FROM transactions WHERE total_price > 0 AND tax_paid = TRUE"
+
+	if os.Getenv("DB_TYPE") == "POSTGRES_DSN" {
+		queryYear += " AND TO_CHAR(created_at, 'YYYY') = ?"
+	} else {
+		queryYear += " AND substr(created_at, 1, 4) = ?"
+	}
+
+	var unpaid float64 = 0.0
+
+	/*
 	err = db.DB.Raw(`
 		SELECT COALESCE(SUM(tax_amount), 0)
 		FROM tax
 		WHERE is_paid = FALSE AND user_id = ? AND month_year = ?
 	`, userID, yearMonth).Scan(&unpaid).Error
+	*/
+
+	err = db.DB.Raw(queryYear, year).Scan(&yearTransactions).Error
 
 	if err != nil {
 		log.Printf("Greška pri dohvatanju neplaćenog poreza za user-a %d: %v", userID, err)
@@ -251,6 +342,66 @@ func (tc *TaxController) GetAggregatedTaxForUser(c *fiber.Ctx) error {
 			Success: false,
 			Error:   "Greška pri čitanju podataka iz baze",
 		})
+	}
+
+	for _, transaction := range yearTransactions {
+		profit := transaction.TotalPrice
+		tax := profit * 0.15
+
+		var userId uint = 0
+		if transaction.OrderID != 0 {
+			// order
+			var order types.Order
+			if err := db.DB.First(&order, transaction.OrderID).Error; err != nil {
+				continue
+			}
+
+			userId = order.UserID
+		} else {
+			// otc
+			var contract types.OptionContract
+			if err := db.DB.First(&contract, transaction.ContractID).Error; err != nil {
+				continue
+			}
+
+			userId = *contract.SellerID
+		}
+
+		if userId == 0 || userId != uint(userID) {
+			continue
+		}
+
+		paid += tax
+	}
+
+	for _, transaction := range monthTransactions {
+		profit := transaction.TotalPrice
+		tax := profit * 0.15
+
+		var userId uint = 0
+		if transaction.OrderID != 0 {
+			// order
+			var order types.Order
+			if err := db.DB.First(&order, transaction.OrderID).Error; err != nil {
+				continue
+			}
+
+			userId = order.UserID
+		} else {
+			// otc
+			var contract types.OptionContract
+			if err := db.DB.First(&contract, transaction.ContractID).Error; err != nil {
+				continue
+			}
+
+			userId = *contract.SellerID
+		}
+
+		if userId == 0 || userId != uint(userID) {
+			continue
+		}
+
+		unpaid += tax
 	}
 
 	var isActuary bool

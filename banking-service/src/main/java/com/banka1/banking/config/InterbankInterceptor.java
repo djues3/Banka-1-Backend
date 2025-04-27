@@ -56,7 +56,7 @@ public class InterbankInterceptor implements HandlerInterceptor {
             Event event;
 
             try {
-                if (rawPayload == null || rawPayload.isEmpty()) {
+                if (rawPayload.isEmpty()) {
                     event = eventService.receiveEvent(new InterbankMessageDTO<>(), "", request.getRemoteAddr());
                     request.setAttribute("event", event);
                     request.setAttribute("startTime", System.currentTimeMillis());

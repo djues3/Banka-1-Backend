@@ -25,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -138,11 +139,11 @@ public class ExchangeServiceTest {
         when(currencyRepository.findByCode(CurrencyType.EUR)).thenReturn(Optional.of(currencyEUR));
         when(currencyRepository.findByCode(CurrencyType.USD)).thenReturn(Optional.of(currencyUSD));
         when(userServiceCustomer.getCustomerById(10L)).thenReturn(customerDTO);
-        doReturn("123456").when(otpTokenService).generateOtp(anyLong());
+        doReturn("123456").when(otpTokenService).generateOtp(any(UUID.class));
 
         when(transferRepository.saveAndFlush(any(Transfer.class))).thenAnswer(invocation -> {
             Transfer savedTransfer = invocation.getArgument(0);
-            savedTransfer.setId(102L);
+            savedTransfer.setId(UUID.randomUUID());
             return savedTransfer;
         });
 

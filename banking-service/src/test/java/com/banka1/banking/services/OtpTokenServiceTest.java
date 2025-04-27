@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,10 +26,12 @@ public class OtpTokenServiceTest {
 
     private OtpToken otpToken;
 
+    private final UUID uuid = UUID.randomUUID();
+
     @BeforeEach
     void setUp() {
         otpToken = new OtpToken();
-        otpToken.setTransferId(1L);
+        otpToken.setTransferId(uuid);
         otpToken.setOtpCode("123456");
         otpToken.setExpirationTime(System.currentTimeMillis() + (5 * 60 * 1000));
         otpToken.setUsed(false);
@@ -42,7 +45,7 @@ public class OtpTokenServiceTest {
             return savedOtp;
         });
 
-        String generatedOtp = otpTokenService.generateOtp(1L);
+        String generatedOtp = otpTokenService.generateOtp(uuid);
 
         assertNotNull(generatedOtp);
         assertEquals(6, generatedOtp.length());
@@ -51,9 +54,9 @@ public class OtpTokenServiceTest {
 
     @Test
     void isOtpValidShouldReturnTrueWhenOtpIsValid() {
-        when(otpTokenRepository.findByTransferIdAndOtpCode(1L, "123456")).thenReturn(Optional.of(otpToken));
+        when(otpTokenRepository.findByTransferIdAndOtpCode(uuid, "123456")).thenReturn(Optional.of(otpToken));
 
-        boolean isValid = otpTokenService.isOtpValid(1L, "123456");
+        boolean isValid = otpTokenService.isOtpValid(uuid, "123456");
 
         assertTrue(isValid);
     }
@@ -61,9 +64,9 @@ public class OtpTokenServiceTest {
     @Test
     void isOtpValidShouldReturnFalseWhenOtpIsUsed() {
         otpToken.setUsed(true);
-        when(otpTokenRepository.findByTransferIdAndOtpCode(1L, "123456")).thenReturn(Optional.of(otpToken));
+        when(otpTokenRepository.findByTransferIdAndOtpCode(uuid, "123456")).thenReturn(Optional.of(otpToken));
 
-        boolean isValid = otpTokenService.isOtpValid(1L, "123456");
+        boolean isValid = otpTokenService.isOtpValid(uuid, "123456");
 
         assertFalse(isValid);
     }
@@ -71,18 +74,18 @@ public class OtpTokenServiceTest {
     @Test
     void isOtpExpiredShouldReturnTrueWhenOtpIsExpired() {
         otpToken.setExpirationTime(System.currentTimeMillis() - 1000);
-        when(otpTokenRepository.findByTransferId(1L)).thenReturn(Optional.of(otpToken));
+        when(otpTokenRepository.findByTransferId(uuid)).thenReturn(Optional.of(otpToken));
 
-        boolean isExpired = otpTokenService.isOtpExpired(1L);
+        boolean isExpired = otpTokenService.isOtpExpired(uuid);
 
         assertTrue(isExpired);
     }
 
     @Test
     void markOtpAsUsedShouldSetOtpToUsed() {
-        when(otpTokenRepository.findByTransferIdAndOtpCode(1L, "123456")).thenReturn(Optional.of(otpToken));
+        when(otpTokenRepository.findByTransferIdAndOtpCode(uuid, "123456")).thenReturn(Optional.of(otpToken));
 
-        otpTokenService.markOtpAsUsed(1L, "123456");
+        otpTokenService.markOtpAsUsed(uuid, "123456");
 
         assertTrue(otpToken.isUsed());
         verify(otpTokenRepository, times(1)).save(otpToken);

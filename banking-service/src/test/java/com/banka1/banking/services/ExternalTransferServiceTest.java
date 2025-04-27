@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -49,7 +50,7 @@ public class ExternalTransferServiceTest {
         toAccount.setBalance(500.0);
 
         transfer = new Transfer();
-        transfer.setId(1L);
+        transfer.setId(UUID.randomUUID());
         transfer.setFromAccountId(fromAccount);
         transfer.setToAccountId(toAccount);
         transfer.setAmount(200.0);
@@ -59,11 +60,13 @@ public class ExternalTransferServiceTest {
 
     @Test
     void testProcessInternalTransfer_Success() {
-        when(transferRepository.findById(1L)).thenReturn(Optional.of(transfer));
+        var uuid = UUID.randomUUID();
+
+        when(transferRepository.findById(uuid)).thenReturn(Optional.of(transfer));
         when(accountRepository.save(any(Account.class))).thenReturn(fromAccount);
         when(transactionRepository.save(any(Transaction.class))).thenReturn(new Transaction());
 
-        String result = transferService.processInternalTransfer(1L);
+        String result = transferService.processInternalTransfer(uuid);
 
         assertEquals("Transfer completed successfully", result);
         assertEquals(800.0, fromAccount.getBalance());
@@ -78,9 +81,10 @@ public class ExternalTransferServiceTest {
     @Test
     void testProcessInternalTransfer_FailedDueToInsufficientFunds() {
         transfer.setAmount(1500.0); // Više nego što ima na računu
-        when(transferRepository.findById(1L)).thenReturn(Optional.of(transfer));
+        var uuid = UUID.randomUUID();
+        when(transferRepository.findById(uuid)).thenReturn(Optional.of(transfer));
 
-        Exception exception = assertThrows(RuntimeException.class, () -> transferService.processInternalTransfer(1L));
+        Exception exception = assertThrows(RuntimeException.class, () -> transferService.processInternalTransfer(uuid));
 
         assertEquals("Insufficient funds", exception.getMessage());
         assertEquals(TransferStatus.FAILED, transfer.getStatus());
@@ -93,9 +97,10 @@ public class ExternalTransferServiceTest {
     @Test
     void testProcessInternalTransfer_FailedDueToInvalidStatus() {
         transfer.setStatus(TransferStatus.COMPLETED);
-        when(transferRepository.findById(1L)).thenReturn(Optional.of(transfer));
+        var uuid = UUID.randomUUID();
+        when(transferRepository.findById(uuid)).thenReturn(Optional.of(transfer));
 
-        Exception exception = assertThrows(RuntimeException.class, () -> transferService.processInternalTransfer(1L));
+        Exception exception = assertThrows(RuntimeException.class, () -> transferService.processInternalTransfer(uuid));
 
         assertEquals("Transfer is not in pending state", exception.getMessage());
 

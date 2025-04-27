@@ -10,17 +10,17 @@ TRUNCATE TABLE rate_change CASCADE;
 TRUNCATE TABLE otc_transaction CASCADE;
 
 -- Reset sequences after truncating tables
-ALTER SEQUENCE account_id_seq RESTART WITH 100;
-ALTER SEQUENCE company_id_seq RESTART WITH 100;
-ALTER SEQUENCE currency_id_seq RESTART WITH 1;
-ALTER SEQUENCE exchange_pair_id_seq RESTART WITH 1;
-ALTER SEQUENCE installment_id_seq RESTART WITH 1;
-ALTER SEQUENCE loan_id_seq RESTART WITH 1;
-ALTER SEQUENCE otp_token_id_seq RESTART WITH 1;
-ALTER SEQUENCE receiver_id_seq RESTART WITH 1;
-ALTER SEQUENCE transfer_id_seq RESTART WITH 1;
-ALTER SEQUENCE transaction_id_seq RESTART WITH 1;
-ALTER SEQUENCE otc_transaction_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS account_id_seq RESTART WITH 100;
+ALTER SEQUENCE IF EXISTS company_id_seq RESTART WITH 100;
+ALTER SEQUENCE IF EXISTS currency_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS exchange_pair_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS installment_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS loan_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS otp_token_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS receiver_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS transfer_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS transaction_id_seq RESTART WITH 1;
+ALTER SEQUENCE IF EXISTS otc_transaction_id_seq RESTART WITH 1;
 
 
 -- Populate currencies
@@ -60,6 +60,9 @@ VALUES
  2029030500000, 2025030500000, 1, 0.0, 0.0, 7, 'ACTIVE', 'BANK', 'STANDARD'),
 
 (3,'111000100000000399', 10000000.0, 1, 1000000.0, 1000000.0, 0.0, 0.0, 'USD',
+ 2029030500000, 2025030500000, 1, 0.0, 0.0, 7, 'ACTIVE', 'BANK', 'STANDARD'),
+
+(1000000000,'111000100000000330', 100000000.0, 1, 1000000.0, 1000000.0, 0.0, 0.0, 'USD',
  2029030500000, 2025030500000, 1, 0.0, 0.0, 7, 'ACTIVE', 'BANK', 'STANDARD'),
 
 (4,'111000100000000499', 10000000.0, 1, 1000000.0, 1000000.0, 0.0, 0.0, 'CHF',
@@ -180,7 +183,7 @@ INSERT INTO receiver (customer_id, account_number, first_name, last_name, addres
 VALUES (3, '111000100000000210', 'Nemanja', 'Marjanov', 'Knez Mihailova 8');
 
 INSERT INTO receiver (customer_id, account_number, first_name, last_name, address)
-VALUES (3, '444000100000000101', 'Jelena', 'Jovanovic', 'Knez Mihailova 8');
+VALUES (3, '4440001000000000521', 'Jelena', 'Jovanovic', 'Knez Mihailova 8');
 
 INSERT INTO receiver (customer_id, account_number, first_name, last_name, address)
 VALUES (3, '111000111225344510', 'Anastasija', 'Milinković', 'Knez Mihailova 8');
@@ -411,24 +414,24 @@ VALUES (TRUE,FALSE,34000.0,21,NULL,1741176000000,1835812800000,'AMERICAN_EXPRESS
 
 --- TRANSFERI I TRANSAKCIJE
 
-INSERT INTO transfer(amount, completed_at, created_at, from_account_id, from_currency_id, to_account_id, to_currency_id, adress, note, otp, payment_code, payment_description, payment_reference, receiver, status, type)
-VALUES (1000.0, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000*2, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, 100, 1, 20, 1, 'Ustanicka 1', 'Payment for services', '123', '234', 'Payment for services', '94', 'Jelena Jovanovic', 'COMPLETED', 'INTERNAL');
+INSERT INTO transfer(id,amount, completed_at, created_at, from_account_id, from_currency_id, to_account_id, to_currency_id, adress, note, otp, payment_code, payment_description, payment_reference, receiver, status, type)
+VALUES ('295da618-3089-4038-b8ef-783f591aca6f', 1000.0, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000*2, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, 100, 1, 20, 1, 'Ustanicka 1', 'Payment for services', '123', '234', 'Payment for services', '94', 'Jelena Jovanovic', 'COMPLETED', 'INTERNAL');
 
 -- Jovan (ID:3 Racun:1 ) -> Jelena (ID:6)
-INSERT INTO transfer(amount, completed_at, created_at, from_account_id, from_currency_id, to_account_id, to_currency_id, adress, note, otp, payment_code, payment_description, payment_reference, receiver, status, type)
-VALUES (1000.0, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000*2, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, 100, 1, 20, 1, 'Ustanicka 1', 'Payment for services', '123', '234', 'Payment for services', '94', 'Jelena Jovanovic', 'COMPLETED', 'INTERNAL');
+INSERT INTO transfer(id, amount, completed_at, created_at, from_account_id, from_currency_id, to_account_id, to_currency_id, adress, note, otp, payment_code, payment_description, payment_reference, receiver, status, type)
+VALUES ('59dc21d2-721b-4280-aef2-5c31a1db87f9', 1000.0, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000*2, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, 100, 1, 20, 1, 'Ustanicka 1', 'Payment for services', '123', '234', 'Payment for services', '94', 'Jelena Jovanovic', 'COMPLETED', 'INTERNAL');
 
 INSERT INTO transaction(amount, final_amount, fee, bank_only, currency_id, from_account_id, timestamp, date, time, to_account_id,transfer_id, description)
-VALUES (1000.0,1000.0,0.0,false,1,100,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 20,2,'Payment for services');
+VALUES (1000.0,1000.0,0.0,false,1,100,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 20,'59dc21d2-721b-4280-aef2-5c31a1db87f9','Payment for services');
 INSERT INTO transaction(amount, final_amount, fee, bank_only, currency_id, from_account_id, timestamp, date, time, to_account_id,transfer_id, description)
-VALUES (1000.0,1000.0,0.0,false,1,100,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 20,2,'Payment for services');
+VALUES (1000.0,1000.0,0.0,false,1,100,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 20,'59dc21d2-721b-4280-aef2-5c31a1db87f9','Payment for services');
 
 -- Anastasija -> Jovan
-INSERT INTO transfer(amount, completed_at, created_at, from_account_id, from_currency_id, to_account_id, to_currency_id, adress, note, otp, payment_code, payment_description, payment_reference, receiver, status, type)
-VALUES (30000.0, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000*2, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, 11, 1, 100, 1, 'Milana Mijalkovica 1', 'Payment for shopping', '233', '234', 'Payment for shopping', '95', null, 'COMPLETED', 'INTERNAL');
+INSERT INTO transfer(id, amount, completed_at, created_at, from_account_id, from_currency_id, to_account_id, to_currency_id, adress, note, otp, payment_code, payment_description, payment_reference, receiver, status, type)
+VALUES ('f6089303-f77d-4343-884d-98d1ac6cf8c7', 30000.0, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000*2, EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, 11, 1, 100, 1, 'Milana Mijalkovica 1', 'Payment for shopping', '233', '234', 'Payment for shopping', '95', null, 'COMPLETED', 'INTERNAL');
 
 INSERT INTO transaction(amount, final_amount, fee, bank_only, currency_id, from_account_id, timestamp, date, time, to_account_id,transfer_id, description)
-VALUES (30000.0,30000.0,0.0,false,1,11,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 100,3,'Payment for shopping');
+VALUES (30000.0,30000.0,0.0,false,1,11,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 100,'f6089303-f77d-4343-884d-98d1ac6cf8c7','Payment for shopping');
 INSERT INTO transaction(amount, final_amount, fee, bank_only, currency_id, from_account_id, timestamp, date, time, to_account_id,transfer_id, description)
-VALUES (1000.0,1000.0,0.0,false,1,11,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 100,3,'Payment for shopping');
+VALUES (1000.0,1000.0,0.0,false,1,11,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000, TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'DD-MM-YYYY'), TO_CHAR(CURRENT_TIMESTAMP + INTERVAL '30 days', 'HH24:MI'), 100,'f6089303-f77d-4343-884d-98d1ac6cf8c7','Payment for shopping');
 

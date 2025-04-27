@@ -1,5 +1,9 @@
 package com.banka1.banking.services;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.banka1.banking.config.InterbankConfig;
 import com.banka1.banking.dto.CustomerDTO;
 import com.banka1.banking.dto.MoneyTransferDTO;
@@ -8,24 +12,19 @@ import com.banka1.banking.models.*;
 import com.banka1.banking.models.helper.CurrencyType;
 import com.banka1.banking.repository.*;
 import com.banka1.common.listener.MessageHelper;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
-import org.springframework.jms.core.JmsTemplate;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import java.util.Map;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 import org.mockito.quality.Strictness;
+import org.springframework.jms.core.JmsTemplate;
+
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Full-coverage tests for {@link TransferService#createForeignBankTransfer(MoneyTransferDTO)}.
@@ -48,6 +47,9 @@ class CreateForeignBankTransferTest {
     @Mock private ReceiverService          receiverSvc;
     @Mock private InterbankService         interbankSvc;
     @Mock private InterbankConfig          cfg;
+
+    private UUID uuid = UUID.randomUUID();
+
 
     /** service under test */
     private TransferService service;
@@ -106,21 +108,21 @@ class CreateForeignBankTransferTest {
         // saveAndFlush inside createForeignBankMoneyTransferEntity must return entity w/ id
         Mockito.doAnswer(inv -> {
             Transfer t = inv.getArgument(0, Transfer.class);
-            t.setId(77L);      // pretend DB generated id = 77
+            t.setId(uuid);      // pretend DB generated id = 77
             return t;
         }).when(transferRepo).saveAndFlush(any(Transfer.class));
 
-        when(otpSvc.generateOtp(77L)).thenReturn("OTP-CODE");
+        when(otpSvc.generateOtp(uuid)).thenReturn("OTP-CODE");
         when(transferRepo.save(any(Transfer.class))).thenAnswer(inv -> inv.getArgument(0));
 
         /* --- when --- */
-        Long id = service.createForeignBankTransfer(dtoOk);
+        UUID id = service.createForeignBankTransfer(dtoOk);
 
         /* --- then --- */
-        assertEquals(77L, id);
+        assertEquals(uuid, id);
 
         // OTP generated & written back
-        verify(otpSvc).generateOtp(77L);
+        verify(otpSvc).generateOtp(uuid);
         verify(transferRepo).save(argThat(t -> "OTP-CODE".equals(t.getOtp())));
 
 

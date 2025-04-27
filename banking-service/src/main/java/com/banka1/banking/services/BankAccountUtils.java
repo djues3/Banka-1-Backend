@@ -15,13 +15,13 @@ public class BankAccountUtils {
 
     public Account getBankAccountForCurrency(CurrencyType currencyType){
         return accountRepository
-                .findByTypeAndCurrencyType(AccountType.BANK,currencyType)
+                .findFirstByTypeAndCurrencyType(AccountType.BANK, currencyType)
                 .orElseThrow(() -> new RuntimeException("Račun banke za valutu " + currencyType + " nije pronađen."));
     }
 
     public Account getCountryAccountForCurrency(CurrencyType currencyType){
         return accountRepository
-                .findByTypeAndCurrencyType(AccountType.COUNTRY,currencyType)
+                .findFirstByTypeAndCurrencyType(AccountType.COUNTRY, currencyType)
                 .orElseThrow(() -> new RuntimeException("Račun drzave za valutu " + currencyType + " nije pronađen."));
     }
 

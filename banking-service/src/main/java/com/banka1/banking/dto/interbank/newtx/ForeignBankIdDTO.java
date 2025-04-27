@@ -7,5 +7,5 @@ import lombok.Data;
 @AllArgsConstructor
 public class ForeignBankIdDTO {
     private String routingNumber;
-    private String userId;
+    private String id;
 }

@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -40,6 +41,8 @@ class ExternalTransferServiceUnitTest {
     private Account fromAccount;
     private Account toAccount;
 
+    private final UUID uuid = UUID.randomUUID();
+
     @BeforeEach
     void setUp() {
         fromAccount = new Account();
@@ -51,7 +54,7 @@ class ExternalTransferServiceUnitTest {
         toAccount.setBalance(3000.0);
 
         transfer = new Transfer();
-        transfer.setId(100L);
+        transfer.setId(uuid);
         transfer.setFromAccountId(fromAccount);
         transfer.setToAccountId(toAccount);
         transfer.setAmount(2000.0);
@@ -62,10 +65,10 @@ class ExternalTransferServiceUnitTest {
     @Test
     @Transactional
     void shouldProcessExternalTransferSuccessfully() {
-        when(transferRepository.findById(100L)).thenReturn(Optional.of(transfer));
+        when(transferRepository.findById(uuid)).thenReturn(Optional.of(transfer));
         when(accountRepository.save(any(Account.class))).thenReturn(fromAccount, toAccount);
 
-        String result = transferService.processTransfer(100L);
+        String result = transferService.processTransfer(uuid);
 
         assertEquals("Transfer completed successfully", result);
         assertEquals(TransferStatus.COMPLETED, transfer.getStatus());
@@ -78,9 +81,9 @@ class ExternalTransferServiceUnitTest {
     @Transactional
     void shouldFailExternalTransferWhenInsufficientBalance() {
         transfer.setAmount(6000.0);
-        when(transferRepository.findById(100L)).thenReturn(Optional.of(transfer));
+        when(transferRepository.findById(uuid)).thenReturn(Optional.of(transfer));
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> transferService.processTransfer(100L));
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> transferService.processTransfer(uuid));
         assertEquals("Insufficient balance for transfer", exception.getMessage());
         assertEquals(TransferStatus.FAILED, transfer.getStatus());
         verify(transferRepository, times(1)).save(transfer);

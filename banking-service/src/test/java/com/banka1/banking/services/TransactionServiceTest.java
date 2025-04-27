@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -56,6 +57,9 @@ public class TransactionServiceTest {
     private Transfer externalTransfer;
     private Currency currency;
 
+    private final UUID uuid = UUID.randomUUID();
+    private final UUID uuid2 = UUID.randomUUID();
+
     @BeforeEach
     void setUp() {
         // Setup test accounts
@@ -76,7 +80,7 @@ public class TransactionServiceTest {
 
         // Setup internal transfer
         internalTransfer = new Transfer();
-        internalTransfer.setId(1L);
+        internalTransfer.setId(uuid);
         internalTransfer.setFromAccountId(fromAccount);
         internalTransfer.setToAccountId(toAccount);
         internalTransfer.setAmount(100.0);
@@ -87,7 +91,7 @@ public class TransactionServiceTest {
 
         // Setup external transfer
         externalTransfer = new Transfer();
-        externalTransfer.setId(2L);
+        externalTransfer.setId(uuid2);
         externalTransfer.setFromAccountId(fromAccount);
         externalTransfer.setToAccountId(toAccount);
         externalTransfer.setAmount(100.0);

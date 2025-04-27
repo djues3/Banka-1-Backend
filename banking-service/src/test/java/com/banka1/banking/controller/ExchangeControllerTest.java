@@ -10,6 +10,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -28,7 +30,7 @@ class ExchangeControllerTest {
         dto.setAmount(100.0);
         
         when(exchangeService.validateExchangeTransfer(dto)).thenReturn(true);
-        when(exchangeService.createExchangeTransfer(dto)).thenReturn(123L);
+        when(exchangeService.createExchangeTransfer(dto)).thenReturn(UUID.randomUUID());
 
         ResponseEntity<?> response = exchangeController.exchangeMoneyTransfer(dto);
         

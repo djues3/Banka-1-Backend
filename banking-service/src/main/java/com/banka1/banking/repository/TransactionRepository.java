@@ -7,11 +7,12 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     List<Transaction> findByFromAccountId(Account fromAccountId);
     List<Transaction> findByToAccountId(Account toAccountId);
-    Optional<Transaction> findByTransferId(Long transferId);
+    Optional<Transaction> findByTransferId(UUID transferId);
     List<Transaction> findByFromAccountIdInOrToAccountIdIn(List<Account> fromAccounts, List<Account> toAccounts);
 }

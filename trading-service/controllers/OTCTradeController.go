@@ -1212,6 +1212,7 @@ func InitPortfolioRoutess(app *fiber.App) {
 }
 
 func GetPublicStocks(ctx *fiber.Ctx) error {
+	log.Infof("Fetching public stocks")
 	const myRoutingNumber = 111
 
 	var portfolios []types.Portfolio
@@ -1480,13 +1481,11 @@ func (c *OTCTradeController) CreateInterbankNegotiation(ctx *fiber.Ctx) error {
 	}
 
 	ourRouting := 111
-	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"success": true,
-		"data": dto.ForeignBankId{
+	return ctx.Status(fiber.StatusCreated).JSON(
+		dto.ForeignBankId{
 			RoutingNumber: ourRouting,
 			ID:            negID,
-		},
-	})
+		})
 }
 
 func (c *OTCTradeController) CounterInterbankNegotiation(ctx *fiber.Ctx) error {
