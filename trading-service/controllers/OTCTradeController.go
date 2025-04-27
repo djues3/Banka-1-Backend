@@ -578,6 +578,7 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 		return ctx.Status(500).JSON(types.Response{false, "", "Greška pri ažuriranju ponude"})
 	}
 
+	var txKey *string
 	userIDStr := strconv.FormatUint(uint64(userID), 10)
 
 	const myRouting = 111
@@ -622,6 +623,7 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 			RoutingNumber:       myRouting,
 			LocallyGeneratedKey: fmt.Sprintf("premium-%d", time.Now().Unix()),
 		}
+		txKey = &idemp.LocallyGeneratedKey
 		debit := dto.PostingDTO{
 			Account: dto.TxAccountDTO{
 				Type: "ACCOUNT",
@@ -656,6 +658,7 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 				TransactionId: dto.ForeignBankIdDTO{RoutingNumber: myRouting, UserId: idemp.LocallyGeneratedKey},
 			},
 		}
+
 		body, _ := json.Marshal(interbankMsg)
 		req, _ := http.NewRequest("POST", os.Getenv("BANKING_SERVICE_URL")+"/interbank/internal", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -684,7 +687,8 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 		Premium:             trade.Premium,
 		UID:                 off.ID.ID,
 		SettlementAt:        settleAt,
-		Status:              "active",
+		TransactionID:       txKey,
+		Status:              "waitinforpremium",
 		CreatedAt:           time.Now().Unix(),
 	}
 	if err := db.DB.Create(&contract).Error; err != nil {
@@ -1587,7 +1591,6 @@ func (c *OTCTradeController) CloseInterbankNegotiation(ctx *fiber.Ctx) error {
 			"error":   "Negotiation is already closed or resolved",
 		})
 	}
-	//popravi last modified
 	trade.Status = "rejected"
 	trade.LastModified = time.Now().Unix()
 	trade.ModifiedBy = fmt.Sprintf("%d%s", routingNum, negID)
@@ -1635,6 +1638,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 		})
 	}
 
+	var txKey *string
 	ourRouting := 111
 	if strings.HasPrefix(*trade.RemoteBuyerID, strconv.Itoa(ourRouting)) {
 		buyerIDNumStr := (*trade.RemoteBuyerID)[len(strconv.Itoa(ourRouting)):]
@@ -1662,6 +1666,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 					RoutingNumber:       ourRouting,
 					LocallyGeneratedKey: fmt.Sprintf("premium-%d", time.Now().Unix()),
 				}
+				txKey = &idemp.LocallyGeneratedKey
 				debit := dto.PostingDTO{
 					Account: dto.TxAccountDTO{
 						Type: "ACCOUNT",
@@ -1726,7 +1731,8 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 		Premium:             trade.Premium,
 		SettlementAt:        trade.SettlementAt,
 		RemoteNegotiationID: trade.RemoteNegotiationID,
-		Status:              "active",
+		TransactionID:       txKey,
+		Status:              "waitinforpremium",
 		CreatedAt:           time.Now().Unix(),
 	}
 	if err := db.DB.Create(&contract).Error; err != nil {
@@ -1882,6 +1888,18 @@ func (c *OTCTradeController) handleCommitTX(
 ) dto.VoteDTO {
 	fmt.Println(key)
 	var rec types.InterbankTxnRecord
+	txID := commit.TransactionId.UserId
+	var oc types.OptionContract
+	if err := db.DB.
+		Where("transaction_id = ?", txID).
+		First(&oc).Error; err == nil {
+		oc.Status = "active"
+		if saveErr := db.DB.Save(&oc).Error; saveErr != nil {
+			log.Errorf("Ne mogu da ažuriram OptionContract status: %v", saveErr)
+		}
+		return dto.VoteDTO{Vote: "YES"}
+	}
+
 	if err := db.DB.
 		Where("transaction_id = ?", commit.TransactionId.UserId).
 		First(&rec).Error; err != nil {

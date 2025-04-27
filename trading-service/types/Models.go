@@ -126,6 +126,8 @@ type OptionContract struct {
 	Premium             float64    `gorm:"not null" json:"premium"`
 	UID                 string     `gorm:"type:varchar(255);index" json:"uid,omitempty"`
 	SettlementAt        time.Time  `gorm:"not null" json:"settlementAt"`
+	TransactionID       *string    `gorm:"" json:"transactionId,omitempty"`
+	IsPremiumPaid       *bool      `gorm:"default:false" json:"isPremiumPaid,omitempty"`
 	Status              string     `gorm:"type:text;default:'active'" json:"status"`
 	IsExercised         bool       `gorm:"default:false" json:"isExercised"`
 	CreatedAt           int64      `gorm:"autoCreateTime" json:"createdAt"`
