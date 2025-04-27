@@ -9,6 +9,6 @@ import java.util.List;
 public class InterbankTransactionDTO {
     private List<PostingDTO> postings;
     private String message;
-    private IdempotenceKey transactionId;
+    private ForeignBankIdDTO transactionId;
     private String timestamp;
 }

@@ -7,14 +7,15 @@ import com.banka1.banking.dto.MoneyTransferDTO;
 import com.banka1.banking.dto.NotificationDTO;
 import com.banka1.banking.models.*;
 import com.banka1.banking.models.Currency;
-import com.banka1.banking.models.helper.AccountStatus;
 import com.banka1.banking.models.helper.CurrencyType;
 import com.banka1.banking.models.helper.IdempotenceKey;
 import com.banka1.banking.models.helper.TransferStatus;
 import com.banka1.banking.models.helper.TransferType;
 import com.banka1.banking.repository.*;
 import com.banka1.common.listener.MessageHelper;
+
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,13 +24,11 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.util.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.*;
 
 @Service
 @Slf4j
@@ -80,7 +79,7 @@ public class TransferService {
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
-    public String processTransfer(Long transferId) {
+    public String processTransfer(UUID transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new RuntimeException("Transfer not found"));
 
@@ -89,7 +88,6 @@ public class TransferService {
             case FOREIGN_BANK -> processForeignBankTransfer(transferId);
             case INTERNAL, EXCHANGE -> processInternalTransfer(transferId);
             case EXTERNAL, FOREIGN -> processExternalTransfer(transferId);
-            default -> throw new RuntimeException("Invalid transfer type");
         };
     }
 
@@ -535,7 +533,7 @@ public class TransferService {
 
 
     @Transactional
-    public String processForeignBankTransfer(Long transferId) {
+    public String processForeignBankTransfer(UUID transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new RuntimeException("Transfer not found"));
 
@@ -586,7 +584,7 @@ public class TransferService {
 
 
     @Transactional
-    public String processInternalTransfer(Long transferId) {
+    public String processInternalTransfer(UUID transferId) {
         Transfer transfer = transferRepository.findById(transferId).orElseThrow(() -> new RuntimeException("Transfer not found"));
 
         // Provera statusa i tipa transfera
@@ -667,7 +665,7 @@ public class TransferService {
     }
 
     @Transactional
-    public String processExternalTransfer(Long transferId) {
+    public String processExternalTransfer(UUID transferId) {
         Transfer transfer = transferRepository.findById(transferId)
                 .orElseThrow(() -> new RuntimeException("Transfer not found"));
 
@@ -790,7 +788,7 @@ public class TransferService {
             }
         }
 
-        if (!toAccountOtp.isEmpty()) {
+        if (toAccountOtp.isPresent()) {
             Account toAccount = toAccountOtp.get();
             return !fromAccount.getOwnerID().equals(toAccount.getOwnerID());
         }
@@ -823,7 +821,7 @@ public class TransferService {
         return transferRepository.saveAndFlush(transfer);
     }
 
-    public Long createInternalTransfer(InternalTransferDTO internalTransferDTO){
+    public UUID createInternalTransfer(InternalTransferDTO internalTransferDTO){
 
         Optional<Account> fromAccountOtp = accountRepository.findById(internalTransferDTO.getFromAccountId());
         Optional<Account> toAccountOtp = accountRepository.findById(internalTransferDTO.getToAccountId());
@@ -942,7 +940,7 @@ public class TransferService {
         return transferRepository.saveAndFlush(transfer);
     }
 
-    public Long createMoneyTransfer(MoneyTransferDTO moneyTransferDTO){
+    public UUID createMoneyTransfer(MoneyTransferDTO moneyTransferDTO){
 
         System.out.println("----------------------------------------");
         System.out.println("Creating money transfer");
@@ -1006,7 +1004,7 @@ public class TransferService {
         return null;
     }
 
-    public Long createForeignBankTransfer(MoneyTransferDTO moneyTransferDTO) {
+    public UUID createForeignBankTransfer(MoneyTransferDTO moneyTransferDTO) {
         Optional<Account> fromAccountOtp = accountRepository.findByAccountNumber(moneyTransferDTO.getFromAccountNumber());
 
         if (!fromAccountOtp.isPresent()){
@@ -1073,7 +1071,7 @@ public class TransferService {
 
     }
 
-    public Transfer findById(Long transferId) {
+    public Transfer findById(UUID transferId) {
         return transferRepository.findById(transferId)
                 .orElseThrow(() -> new RuntimeException("Transfer sa ID-jem " + transferId + " nije pronađen"));
     }
@@ -1083,7 +1081,7 @@ public class TransferService {
     }
 
     public Transfer commitForeignBankTransfer(IdempotenceKey idempotenceKey) {
-        Long transferID = Long.valueOf(idempotenceKey.getLocallyGeneratedKey());
+        UUID transferID = UUID.fromString(idempotenceKey.getLocallyGeneratedKey());
         Transfer transfer = transferRepository.findById(transferID)
                 .orElseThrow(() -> new RuntimeException("Transfer not found"));
 
@@ -1132,7 +1130,7 @@ public class TransferService {
     }
 
     public Transfer rollbackForeignBankTransfer(IdempotenceKey idempotenceKey) {
-        Long transferID = Long.valueOf(idempotenceKey.getLocallyGeneratedKey());
+        UUID transferID = UUID.fromString(idempotenceKey.getLocallyGeneratedKey());
         Transfer transfer = transferRepository.findById(transferID)
                 .orElseThrow(() -> new RuntimeException("Transfer not found"));
 

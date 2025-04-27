@@ -1,5 +1,8 @@
 package com.banka1.banking.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import com.banka1.banking.dto.MoneyTransferDTO;
 import com.banka1.banking.models.*;
 import com.banka1.banking.models.helper.CurrencyType;
@@ -10,7 +13,7 @@ import com.banka1.banking.services.BankAccountUtils;
 import com.banka1.banking.services.LoanService;
 import com.banka1.banking.services.TransactionService;
 import com.banka1.banking.services.TransferService;
-import org.junit.jupiter.api.Assertions;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,9 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import java.util.UUID;
 
 @ExtendWith(MockitoExtension.class)
 class LoanPaymentSchedulerTest {
@@ -91,7 +92,7 @@ class LoanPaymentSchedulerTest {
 		installment2.setIsPaid(false);
 
 		transfer = new Transfer();
-		transfer.setId(1L);
+        transfer.setId(UUID.randomUUID());
 	}
 
 	@Test
@@ -168,11 +169,11 @@ class LoanPaymentSchedulerTest {
 
 	@Test
 	void testCalculateInstallment_WithInterest() {
-		Double loanAmount = 1000.0;
-		Double annualInterestRate = 12.0; // 12%
-		Integer numberOfInstallments = 12;
+		double loanAmount = 1000.0;
+		double annualInterestRate = 12.0; // 12%
+		int numberOfInstallments = 12;
 
-		Double installment = loanService.calculateInstallment(loanAmount, annualInterestRate / 12, numberOfInstallments);
+		double installment = loanService.calculateInstallment(loanAmount, annualInterestRate / 12, numberOfInstallments);
 
 		// Expected monthly payment with 1% monthly interest rate
 		// Using formula: P * [r(1+r)^n]/[(1+r)^n-1]
@@ -181,9 +182,9 @@ class LoanPaymentSchedulerTest {
 
 	@Test
 	void testCalculateInstallment_ZeroInterest() {
-		Double loanAmount = 1000.0;
-		Double annualInterestRate = 0.0;
-		Integer numberOfInstallments = 10;
+		double loanAmount = 1000.0;
+		double annualInterestRate = 0.0;
+		int numberOfInstallments = 10;
 
 		Double installment = loanService.calculateInstallment(loanAmount, annualInterestRate, numberOfInstallments);
 

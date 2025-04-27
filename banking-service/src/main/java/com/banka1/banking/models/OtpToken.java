@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.util.UUID;
+
 @Entity
 @Getter
 @Setter
@@ -19,7 +21,7 @@ public class OtpToken {
     private String otpCode;
 
     @Column(nullable = false)
-    private Long transferId;
+    private UUID transferId;
 
     @Column(nullable = false)
     private Long expirationTime;

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.*;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
@@ -58,7 +59,7 @@ class InterbankServiceTest {
         Account mockAccount = mock(Account.class);
         Currency mockCurrency = mock(Currency.class);
 
-        when(mockTransfer.getId()).thenReturn(123L);
+        when(mockTransfer.getId()).thenReturn(UUID.randomUUID());
         when(mockTransfer.getFromAccountId()).thenReturn(mockAccount);
         when(mockTransfer.getAmount()).thenReturn(100.0);
         when(mockTransfer.getPaymentDescription()).thenReturn("Test Description");

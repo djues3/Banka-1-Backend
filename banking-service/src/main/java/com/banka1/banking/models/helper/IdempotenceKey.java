@@ -7,6 +7,7 @@ import jakarta.persistence.Embeddable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 @Setter
 @Getter
@@ -16,6 +17,7 @@ import lombok.Setter;
         @AttributeOverride(name = "routingNumber", column = @Column(name = "routing_number")),
         @AttributeOverride(name = "locallyGeneratedKey", column = @Column(name = "locally_generated_key"))
 })
+@ToString
 public class IdempotenceKey {
 
     private String routingNumber;

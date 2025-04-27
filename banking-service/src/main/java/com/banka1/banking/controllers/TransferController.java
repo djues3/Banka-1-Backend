@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping
@@ -74,7 +75,7 @@ public class TransferController {
                         false, null, "Nevalidni podaci ili nedovoljno sredstava.");
             }
 
-            Long transferId = transferService.createInternalTransfer(transferDTO);
+            UUID transferId = transferService.createInternalTransfer(transferDTO);
 
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK),true, Map.of("message","Interni prenos uspešno kreiran.","transferId",transferId),null);
 
@@ -137,7 +138,7 @@ public class TransferController {
                         false, null, "Nevalidni podaci ili nedovoljno sredstava.");
             }
 
-            Long transferId = transferService.createMoneyTransfer(transferDTO);
+            UUID transferId = transferService.createMoneyTransfer(transferDTO);
 
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK),true, Map.of("message","Transfer novca uspešno kreiran.","transferId",transferId),null);
 

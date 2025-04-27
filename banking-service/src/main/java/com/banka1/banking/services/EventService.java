@@ -4,6 +4,8 @@ import com.banka1.banking.config.InterbankConfig;
 import com.banka1.banking.dto.CreateEventDTO;
 import com.banka1.banking.dto.CreateEventDeliveryDTO;
 import com.banka1.banking.dto.interbank.InterbankMessageDTO;
+import com.banka1.banking.dto.interbank.InterbankMessageType;
+import com.banka1.banking.dto.interbank.newtx.ForeignBankIdDTO;
 import com.banka1.banking.models.Event;
 import com.banka1.banking.models.EventDelivery;
 import com.banka1.banking.models.helper.DeliveryStatus;
@@ -12,18 +14,15 @@ import com.banka1.banking.models.interbank.EventDirection;
 import com.banka1.banking.repository.EventDeliveryRepository;
 import com.banka1.banking.repository.EventRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EventService {
@@ -49,8 +48,11 @@ public class EventService {
             return null;
         }
 
-        if (eventRepository.existsByIdempotenceKey(dto.getIdempotenceKey())) {
-            throw new RuntimeException("Event already exists");
+        if (eventRepository.existsByIdempotenceKeyAndMessageType(dto.getIdempotenceKey(), dto.getMessageType())) {
+            return eventRepository
+                    .findByIdempotenceKey(dto.getIdempotenceKey())
+                    .orElseThrow(
+                            () -> new IllegalArgumentException("Event expected to be present"));
         }
 
         try {
@@ -94,8 +96,7 @@ public class EventService {
 
         event.setIdempotenceKey(createEventDTO.getMessage().getIdempotenceKey());
 
-        Event saved = eventRepository.save(event);
-        return saved;
+	    return eventRepository.save(event);
     }
 
     public EventDelivery createEventDelivery(CreateEventDeliveryDTO createEventDeliveryDTO) {
@@ -108,8 +109,6 @@ public class EventService {
         eventDelivery.setResponseBody(createEventDeliveryDTO.getResponseBody());
 
         eventDelivery.setSentAt(Instant.now());
-
-        System.out.println("Event delivery created: " + eventDelivery.getResponseBody());
 
         return eventDeliveryRepository.save(eventDelivery);
     }
@@ -126,4 +125,13 @@ public class EventService {
                 .orElseThrow(() -> new RuntimeException("Event not found"));
     }
 
+    public Event findEventByTransactionId(ForeignBankIdDTO txId) {
+        return eventRepository
+                .findByTransactionIdInPayload(txId.getRoutingNumber(), txId.getId())
+                .orElseThrow(() -> new RuntimeException("Event not found: " + txId));
+    }
+
+    public boolean existsByIdempotenceKey(IdempotenceKey idempotenceKey, InterbankMessageType messageType) {
+        return eventRepository.existsByIdempotenceKeyAndMessageType(idempotenceKey, messageType);
+    }
 }

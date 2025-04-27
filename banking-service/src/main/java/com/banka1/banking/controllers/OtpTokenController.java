@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/otp")
@@ -63,7 +64,7 @@ public class OtpTokenController {
             )) OtpTokenDTO otpTokenDTO) {
 
         try {
-            Long transferId = otpTokenDTO.getTransferId();
+            UUID transferId = otpTokenDTO.getTransferId();
             String otpCode = otpTokenDTO.getOtpCode();
 
             if (otpTokenService.isOtpExpired(transferId)) {

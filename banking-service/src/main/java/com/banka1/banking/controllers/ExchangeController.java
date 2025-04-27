@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/exchange-transfer")
@@ -69,7 +70,7 @@ public class ExchangeController {
                         false,null,"Nevalidni podaci ili nedovoljno sredstava.");
             }
 
-            Long transferId = exchangeService.createExchangeTransfer(exchangeMoneyTransferDTO);
+            UUID transferId = exchangeService.createExchangeTransfer(exchangeMoneyTransferDTO);
 
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.OK),true, Map.of("message","Interni prenos sa konverzijom uspesno izvršen.","transferId",transferId),null);
 

@@ -2,19 +2,15 @@ package com.banka1.banking.services;
 
 import com.banka1.banking.config.InterbankConfig;
 import com.banka1.banking.dto.CreateEventDeliveryDTO;
-import com.banka1.banking.dto.interbank.InterbankMessageDTO;
 import com.banka1.banking.dto.interbank.InterbankMessageType;
 import com.banka1.banking.dto.interbank.VoteDTO;
-import com.banka1.banking.dto.interbank.committx.CommitTransactionDTO;
-import com.banka1.banking.dto.interbank.newtx.InterbankTransactionDTO;
-import com.banka1.banking.dto.interbank.rollbacktx.RollbackTransactionDTO;
 import com.banka1.banking.models.Event;
 import com.banka1.banking.models.EventDelivery;
 import com.banka1.banking.models.helper.DeliveryStatus;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -33,6 +29,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 
+@Slf4j
 @Service
 public class EventExecutorService {
 
@@ -76,7 +73,8 @@ public class EventExecutorService {
     }
 
     private void attemptDelivery(Event event, int attempt) {
-        System.out.println("Attempting delivery for event: " + event.getId() + ", attempt: " + attempt);
+        log.info("Attempting delivery for event: {}, attempt: {}", event.getId(), attempt);
+        log.info("Event: {}", event);
         Instant start = Instant.now();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
@@ -91,35 +89,32 @@ public class EventExecutorService {
         DeliveryStatus status;
 
         try {
-            System.out.println("Sending request to: " + event.getUrl());
+            log.info("Sending request to: {}", event.getUrl());
             ResponseEntity<String> response = getTemplate().postForEntity(event.getUrl(), entity, String.class);
-            System.out.println("Response: " + response.getBody());
+            log.info("Response: {}", response.getBody());
+            log.info("Response status code: {}", response.getStatusCode());
             responseBody = response.getBody() != null ? new ObjectMapper().writeValueAsString(response.getBody()) : "";
 
-            httpStatus = response.getStatusCodeValue();
+            httpStatus = response.getStatusCode()
+                                 .value();
 
             status = response.getStatusCode().is2xxSuccessful() ? DeliveryStatus.SUCCESS : DeliveryStatus.FAILED;
 
         } catch (Exception ex) {
-            System.out.println(ex.getStackTrace());
+            log.info("Error sending message", ex);
             status = DeliveryStatus.FAILED;
             httpStatus = -1;
             responseBody = ex.getMessage();
         }
 
         if (status == DeliveryStatus.FAILED && attempt < MAX_RETRIES) {
-            eventService.changeEventStatus(event, DeliveryStatus.RETRYING);
             taskScheduler.schedule(() -> attemptDelivery(event, attempt + 1), Instant.now().plus(RETRY_DELAY));
         } else if (status == DeliveryStatus.SUCCESS) {
             eventService.changeEventStatus(event, DeliveryStatus.SUCCESS);
             if (event.getMessageType() == InterbankMessageType.NEW_TX) {
                 handleNewTxSuccess(event, responseBody);
             }
-        } else if (attempt >= MAX_RETRIES) {
-            eventService.changeEventStatus(event, DeliveryStatus.CANCELED);
-            rollbackTransaction(event);
         }
-
         long durationMs = Instant.now().toEpochMilli() - start.toEpochMilli();
 
         CreateEventDeliveryDTO createEventDeliveryDTO = new CreateEventDeliveryDTO();
@@ -134,9 +129,9 @@ public class EventExecutorService {
 
 
     public void handleNewTxSuccess(Event event, String responseBody) {
-        System.out.println("Handling new transaction success for event: " + event.getId());
+        log.info("Handling new transaction success for event: {}", event.getId());
         try {
-            System.out.println("Handling new transaction success for event: " + event.getId());
+            log.info("Handling new transaction success for event: {}", event.getId());
             String actualJson = new ObjectMapper().readValue(responseBody, String.class);
             VoteDTO vote = new ObjectMapper().readValue(actualJson, VoteDTO.class);
 
@@ -147,7 +142,7 @@ public class EventExecutorService {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Exception when handling new tx", e);
             throw new RuntimeException("Failed to handle new transaction success: " + e.getMessage());
         }
     }
@@ -156,7 +151,7 @@ public class EventExecutorService {
         try {
             interbankService.sendRollback(event);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Exception when handling rollback tx", e);
             throw new RuntimeException("Failed to handle rollback transaction: " + e.getMessage());
         }
     }

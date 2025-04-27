@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/log"
 	"github.com/google/uuid"
 	"io"
 	"net/http"
@@ -933,6 +934,7 @@ func InitPortfolioRoutess(app *fiber.App) {
 }
 
 func GetPublicStocks(ctx *fiber.Ctx) error {
+	log.Infof("Fetching public stocks")
 	const myRoutingNumber = 111
 
 	var portfolios []types.Portfolio
@@ -1201,13 +1203,11 @@ func (c *OTCTradeController) CreateInterbankNegotiation(ctx *fiber.Ctx) error {
 	}
 
 	ourRouting := 111
-	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"success": true,
-		"data": dto.ForeignBankId{
+	return ctx.Status(fiber.StatusCreated).JSON(
+		dto.ForeignBankId{
 			RoutingNumber: ourRouting,
 			ID:            negID,
-		},
-	})
+		})
 }
 
 func (c *OTCTradeController) CounterInterbankNegotiation(ctx *fiber.Ctx) error {

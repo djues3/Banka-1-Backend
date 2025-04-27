@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -17,7 +18,7 @@ public class OtpTokenService {
         this.otpTokenRepository = otpTokenRepository;
     }
 
-    public String generateOtp(Long transferId) {
+    public String generateOtp(UUID transferId) {
         Random random = new Random();
         String otpCode = String.format("%06d", random.nextInt(1000000));
 
@@ -31,19 +32,19 @@ public class OtpTokenService {
         return otpCode;
     }
 
-    public boolean isOtpValid(Long transactionId, String otpCode) {
+    public boolean isOtpValid(UUID transactionId, String otpCode) {
         Optional<OtpToken> otpTokenOptional = otpTokenRepository.findByTransferIdAndOtpCode(transactionId,otpCode);
         log.info("otpTokenOptional:{}",otpTokenOptional);
         log.info("otpCode:{}",otpCode);
         return otpTokenOptional.isPresent() && !otpTokenOptional.get().isUsed();
     }
 
-    public boolean isOtpExpired(Long transactionId) {
+    public boolean isOtpExpired(UUID transactionId) {
         Optional<OtpToken> otpTokenOptional = otpTokenRepository.findByTransferId(transactionId);
         return (otpTokenOptional.isEmpty() || (otpTokenOptional.get().getExpirationTime() < System.currentTimeMillis()));
     }
 
-    public void markOtpAsUsed(Long transactionId, String otpCode) {
+    public void markOtpAsUsed(UUID transactionId, String otpCode) {
         Optional<OtpToken> otpTokenOptional = otpTokenRepository.findByTransferIdAndOtpCode(transactionId, otpCode);
         otpTokenOptional.ifPresent(otp -> {
             otp.setUsed(true);
