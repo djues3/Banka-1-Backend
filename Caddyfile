@@ -23,6 +23,31 @@ localhost {
     reverse_proxy {env.CADDY_HOST}:8000
   }
 
+  # Interbank BS
+
+  handle /interbank {
+    reverse_proxy {env.CADDY_HOST}:8082
+  }
+
+  handle /public-stock {
+    reverse_proxy {env.CADDY_HOST}:3000
+  }
+
+  handle /negotiations {
+    reverse_proxy {env.CADDY_HOST}:3000
+  }
+
+  handle /negotiations/* {
+    reverse_proxy {env.CADDY_HOST}:3000
+  }
+
+  handle /user/*/* {
+    @user path /user/*/*
+    rewrite @user /api/customer/{http.request.uri.path.1}/{http.request.uri.path.2}
+    reverse_proxy {env.CADDY_HOST}:8081
+  }
+
+
 	handle {
 		# Frontend
 		reverse_proxy {env.CADDY_HOST}:4200

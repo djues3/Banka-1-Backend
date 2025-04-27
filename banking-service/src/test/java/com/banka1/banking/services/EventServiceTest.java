@@ -68,7 +68,7 @@ class EventServiceTest {
         dto.setIdempotenceKey(idKey);
         dto.setMessageType(InterbankMessageType.NEW_TX);
 
-        when(eventRepository.existsByIdempotenceKey(idKey)).thenReturn(false);
+        when(eventRepository.existsByIdempotenceKeyAndMessageType(eq(idKey), any())).thenReturn(false);
         when(eventRepository.save(any(Event.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Event result = eventService.receiveEvent(dto, "raw-json", "http://source");
@@ -86,7 +86,7 @@ class EventServiceTest {
         dto.setIdempotenceKey(key);
         dto.setMessageType(InterbankMessageType.NEW_TX);
 
-        when(eventRepository.existsByIdempotenceKey(key)).thenReturn(true);
+        when(eventRepository.existsByIdempotenceKeyAndMessageType(eq(key), any())).thenReturn(true);
 
         assertThrows(RuntimeException.class, () -> eventService.receiveEvent(dto, "payload", "url"));
     }

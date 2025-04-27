@@ -20,6 +20,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Method;
 import java.util.Base64;
+import java.util.UUID;
 
 import static org.mockito.Mockito.*;
 
@@ -340,10 +341,10 @@ public class AuthServiceTests {
                 moneyTransferDTO,
                 createCardDTO,
         });
-
+        var uuid = UUID.randomUUID();
         when(createAccountDTO.getOwnerID()).thenReturn(1L);
         when(exchangeMoneyTransferDTO.getAccountFrom()).thenReturn(1L);
-        when(otpTokenDTO.getTransferId()).thenReturn(1L);
+        when(otpTokenDTO.getTransferId()).thenReturn(uuid);
         when(receiverDTO.getCustomerId()).thenReturn(1L);
         when(internalTransferDTO.getFromAccountId()).thenReturn(1L);
         when(moneyTransferDTO.getFromAccountNumber()).thenReturn("1");
@@ -354,7 +355,7 @@ public class AuthServiceTests {
         when(accountService.findById(1L)).thenReturn(account);
         when(accountService.findByAccountNumber("1")).thenReturn(account);
         //when(loanService.findById("1")).thenReturn(loan);
-        when(transferService.findById(1L)).thenReturn(transfer);
+        when(transferService.findById(uuid)).thenReturn(transfer);
 
         when(account.getOwnerID()).thenReturn(1L);
         //when(loan.getAccount()).thenReturn(account);

@@ -4,12 +4,14 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.UUID;
+
 @Data
 @Getter
 @Setter
 public class OtpTokenDTO {
 
-    private Long transferId;
+    private UUID transferId;
     private String otpCode;
 
 }

@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -84,7 +85,7 @@ public class ExchangeService {
         return fromAccount.getOwnerID().equals(toAccount.getOwnerID());
     }
 
-    public Long createExchangeTransfer(ExchangeMoneyTransferDTO exchangeMoneyTransferDTO) {
+    public UUID createExchangeTransfer(ExchangeMoneyTransferDTO exchangeMoneyTransferDTO) {
         Account fromAccount = accountRepository.findById(exchangeMoneyTransferDTO.getAccountFrom())
                 .orElseThrow(() -> new IllegalArgumentException("Račun nije pronađen"));
 

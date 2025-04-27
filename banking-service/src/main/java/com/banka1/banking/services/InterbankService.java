@@ -14,26 +14,25 @@ import com.banka1.banking.dto.interbank.newtx.TxAccountDTO;
 import com.banka1.banking.dto.interbank.newtx.assets.CurrencyAsset;
 import com.banka1.banking.dto.interbank.newtx.assets.MonetaryAssetDTO;
 import com.banka1.banking.dto.interbank.rollbacktx.RollbackTransactionDTO;
-import com.banka1.banking.models.Account;
-import com.banka1.banking.models.Currency;
-import com.banka1.banking.models.Event;
-import com.banka1.banking.models.Transfer;
+import com.banka1.banking.models.*;
 import com.banka1.banking.models.helper.CurrencyType;
 import com.banka1.banking.models.helper.IdempotenceKey;
 import com.banka1.banking.repository.AccountRepository;
 import com.banka1.banking.repository.CurrencyRepository;
+import com.banka1.banking.repository.EventDeliveryRepository;
 import com.banka1.banking.services.requests.RequestBuilder;
 import com.banka1.banking.services.requests.RequestService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.context.annotation.Lazy;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.stereotype.Service;
 
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +43,7 @@ import java.util.UUID;
 public class InterbankService implements InterbankOperationService {
 
     private final EventService eventService;
+    private final EventDeliveryRepository eventDeliveryRepository;
     private final EventExecutorService eventExecutorService;
     private final ObjectMapper objectMapper;
     private final TransferService transferService;
@@ -52,8 +52,18 @@ public class InterbankService implements InterbankOperationService {
     private final InterbankConfig config;
     private final RequestService requestService;
 
-    public InterbankService(EventService eventService, EventExecutorService eventExecutorService, ObjectMapper objectMapper, @Lazy TransferService transferService, AccountRepository accountRepository, CurrencyRepository currencyRepository, InterbankConfig config, RequestService requestService) {
+    public InterbankService(
+            EventService eventService,
+            EventDeliveryRepository eventDeliveryRepository,
+            EventExecutorService eventExecutorService,
+            ObjectMapper objectMapper,
+            @Lazy TransferService transferService,
+            AccountRepository accountRepository,
+            CurrencyRepository currencyRepository,
+            InterbankConfig config,
+            RequestService requestService) {
         this.eventService = eventService;
+        this.eventDeliveryRepository = eventDeliveryRepository;
         this.eventExecutorService = eventExecutorService;
         this.objectMapper = objectMapper;
         this.transferService = transferService;
@@ -66,20 +76,22 @@ public class InterbankService implements InterbankOperationService {
     public void sendInterbankMessage(InterbankMessageDTO<?> messageDto, String targetUrl) {
 
         System.out.println("####################");
-        System.out.println("Sending interbank message: " + messageDto.getMessageType() + " " + messageDto.getIdempotenceKey().getLocallyGeneratedKey());
+        System.out.println(
+                "Sending interbank message: "
+                        + messageDto.getMessageType()
+                        + " "
+                        + messageDto.getIdempotenceKey().getLocallyGeneratedKey());
 
         Event event;
         try {
 
             validateMessageByType(messageDto);
-
+            log.info("Sending message: {}", messageDto);
             String payloadJson = objectMapper.writeValueAsString(messageDto);
             System.out.println("trying to send interbank message: " + payloadJson);
-            event = eventService.createEvent(new CreateEventDTO(
-                    messageDto,
-                    payloadJson,
-                    targetUrl
-            ));
+            event =
+                    eventService.createEvent(
+                            new CreateEventDTO(messageDto, payloadJson, targetUrl));
 
             System.out.println("Attempting to send event: " + event.getId());
 
@@ -99,51 +111,49 @@ public class InterbankService implements InterbankOperationService {
         transaction.setMessageType(InterbankMessageType.NEW_TX);
 
         // Set up the idempotence key
-        IdempotenceKey idempotenceKey = new IdempotenceKey(config.getRoutingNumber(), transfer.getId().toString());
+        IdempotenceKey idempotenceKey =
+                new IdempotenceKey(config.getRoutingNumber(), transfer.getId().toString());
         transaction.setIdempotenceKey(idempotenceKey);
+
+        ForeignBankIdDTO txId =
+                new ForeignBankIdDTO(
+                        idempotenceKey.getRoutingNumber(), idempotenceKey.getLocallyGeneratedKey());
 
         InterbankTransactionDTO message = new InterbankTransactionDTO();
 
         /*
-           Set idempotence key as id for the transaction, will be used to extract
-         */
-        message.setTransactionId(idempotenceKey);
+          Set idempotence key as id for the transaction, will be used to extract
+        */
+        message.setTransactionId(txId);
 
         // Set up timestamp
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
-        message.setTimestamp(
-                java.time.ZonedDateTime.now().format(formatter)
-        );
-
+        message.setTimestamp(ZonedDateTime.now().format(formatter));
 
         // Set up the transaction details
-        message.setPostings(List.of(
-                new PostingDTO(
-                        new TxAccountDTO("PERSON", new ForeignBankIdDTO(
-                                config.getRoutingNumber(),
-                                transfer.getFromAccountId().getAccountNumber()
-                        ), ""),
-                        -transfer.getAmount(),
-                        new MonetaryAssetDTO(
-                                new CurrencyAsset(transfer.getToCurrency().getCode().toString())
-                        )
-                ),
-                new PostingDTO(
-                        new TxAccountDTO("PERSON", new ForeignBankIdDTO(
-                                config.getForeignBankRoutingNumber(),
-                                transfer.getNote()
-                        ), ""),
-                        transfer.getAmount(),
-                        new MonetaryAssetDTO(
-                                new CurrencyAsset(transfer.getFromCurrency().getCode().toString())
-                        )
-                )
-        ));
+        message.setPostings(
+                List.of(
+                        new PostingDTO(
+                                new TxAccountDTO(
+                                        "ACCOUNT",
+                                        null,
+                                        transfer.getFromAccountId().getAccountNumber()),
+                                -transfer.getAmount(),
+                                new MonetaryAssetDTO(
+                                        new CurrencyAsset(
+                                                transfer.getToCurrency().getCode().toString()))),
+                        new PostingDTO(
+                                new TxAccountDTO("ACCOUNT", null, transfer.getNote()),
+                                transfer.getAmount(),
+                                new MonetaryAssetDTO(
+                                        new CurrencyAsset(
+                                                transfer.getFromCurrency()
+                                                        .getCode()
+                                                        .toString())))));
 
         message.setMessage(transfer.getPaymentDescription());
 
         transaction.setMessage(message);
-
 
         // Send the message
         // execute after five seconds for testing purposes
@@ -165,29 +175,53 @@ public class InterbankService implements InterbankOperationService {
     }
 
     public VoteDTO webhook(InterbankMessageDTO<?> messageDto, String rawPayload, String sourceUrl) {
-//        eventService.receiveEvent(messageDto, rawPayload, sourceUrl);
+        //        eventService.receiveEvent(messageDto, rawPayload, sourceUrl);
+        if (eventService.existsByIdempotenceKey(messageDto.getIdempotenceKey(), messageDto.getMessageType())) {
+            var event = eventService.findEventByIdempotenceKey(messageDto.getIdempotenceKey());
+            // Since events get saved before the request reaches this point in the interceptor,
+            // there needs to be a way to ignore them.
+            // This is that way.
+            if (event.getCreatedAt().plusMillis(100).isBefore(Instant.now())) {
+                log.info(
+                        "Replaying event with idempotence key: {}", messageDto.getIdempotenceKey());
+                return replayEvent(messageDto.getIdempotenceKey());
+            }
+
+        }
 
         VoteDTO response = new VoteDTO();
 
         System.out.println("==========================");
-        System.out.println("Received interbank message: " + messageDto.getMessageType() + " " + messageDto.getIdempotenceKey().getLocallyGeneratedKey());
+        System.out.println(
+                "Received interbank message: "
+                        + messageDto.getMessageType()
+                        + " "
+                        + messageDto.getIdempotenceKey().getLocallyGeneratedKey());
 
         switch (messageDto.getMessageType()) {
-            case NEW_TX :
+            case NEW_TX:
                 System.out.println("Received NEW_TX message: " + messageDto.getMessage());
-                InterbankMessageDTO<InterbankTransactionDTO> properNewTx = objectMapper.convertValue(
-                        messageDto,
-                        objectMapper.getTypeFactory().constructParametricType(InterbankMessageDTO.class, InterbankTransactionDTO.class)
-                );
+                InterbankMessageDTO<InterbankTransactionDTO> properNewTx =
+                        objectMapper.convertValue(
+                                messageDto,
+                                objectMapper
+                                        .getTypeFactory()
+                                        .constructParametricType(
+                                                InterbankMessageDTO.class,
+                                                InterbankTransactionDTO.class));
                 response = handleNewTXRequest(properNewTx);
                 break;
-            case COMMIT_TX :
+            case COMMIT_TX:
                 System.out.println("Received COMMIT_TX message: " + messageDto.getMessage());
 
-                InterbankMessageDTO<CommitTransactionDTO> properCommitTx = objectMapper.convertValue(
-                        messageDto,
-                        objectMapper.getTypeFactory().constructParametricType(InterbankMessageDTO.class, CommitTransactionDTO.class)
-                );
+                InterbankMessageDTO<CommitTransactionDTO> properCommitTx =
+                        objectMapper.convertValue(
+                                messageDto,
+                                objectMapper
+                                        .getTypeFactory()
+                                        .constructParametricType(
+                                                InterbankMessageDTO.class,
+                                                CommitTransactionDTO.class));
                 try {
                     handleCommitTXRequest(properCommitTx);
                 } catch (Exception e) {
@@ -198,34 +232,49 @@ public class InterbankService implements InterbankOperationService {
                 }
                 response.setVote("YES");
                 break;
-            case ROLLBACK_TX :
+            case ROLLBACK_TX:
                 response.setVote("YES");
                 break;
             default:
                 throw new IllegalArgumentException("Unknown message type");
-
         }
 
         return response;
     }
 
+    private VoteDTO replayEvent(IdempotenceKey idempotenceKey) {
+        var event = eventService.findEventByIdempotenceKey(idempotenceKey);
+        var delivery = eventDeliveryRepository.findFirstEventDeliveryByEvent(event).orElseThrow(() -> new IllegalArgumentException("Event delivery not found"));
+	    try {
+		    return objectMapper.readValue(delivery.getResponseBody(), VoteDTO.class);
+	    } catch (JsonProcessingException e) {
+		    throw new RuntimeException(e);
+	    }
+
+
+    }
+
     public void handleCommitTXRequest(InterbankMessageDTO<CommitTransactionDTO> messageDto) {
-        Event event = eventService.findEventByIdempotenceKey(messageDto.getMessage().getTransactionId());
+        log.info("Commit tx request: {}", messageDto);
+        Event event =
+                eventService.findEventByTransactionId(messageDto.getMessage().getTransactionId());
         if (event == null) {
-            throw new IllegalArgumentException("Event not found for idempotence key: " + messageDto.getIdempotenceKey());
+            throw new IllegalArgumentException(
+                    "Event not found for idempotence key: " + messageDto.getIdempotenceKey());
         }
 
         InterbankMessageDTO<InterbankTransactionDTO> originalNewTxMessage;
         try {
-            originalNewTxMessage = objectMapper.readValue(
-                    event.getPayload(),
-                    objectMapper.getTypeFactory().constructParametricType(
-                            InterbankMessageDTO.class,
-                            InterbankTransactionDTO.class
-                    )
-            );
+            originalNewTxMessage =
+                    objectMapper.readValue(
+                            event.getPayload(),
+                            objectMapper
+                                    .getTypeFactory()
+                                    .constructParametricType(
+                                            InterbankMessageDTO.class,
+                                            InterbankTransactionDTO.class));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Failed to parse original NEW_TX message: {}", e.getMessage());
             throw new RuntimeException("Failed to parse NEW_TX payload: " + e.getMessage());
         }
 
@@ -234,47 +283,46 @@ public class InterbankService implements InterbankOperationService {
 
         Account localAccount = null;
         Currency localCurrency = null;
-        Double amount = 0.0;
-
-
+        double amount = 0.0;
+        String localAccountId = null;
 
         for (PostingDTO posting : originalMessage.getPostings()) {
-
             if (!(posting.getAsset() instanceof MonetaryAssetDTO)) {
                 forwardCommit(originalNewTxMessage);
                 return;
             }
 
-            System.out.println("Account id: " + posting.getAccount().getId().getUserId() + " routing number: " + posting.getAccount().getId().getRoutingNumber() + " config routing number: " + config.getRoutingNumber());
-            if (posting.getAccount().getId().getRoutingNumber().equalsIgnoreCase(config.getRoutingNumber())) {
-                String localAccountId = posting.getAccount().getId().getUserId();
-                amount = posting.getAmount();
-                System.out.println("AMOUNT: " + amount);
-                Optional<Account> localAccountOpt = accountRepository.findByAccountNumber(localAccountId);
-                if (localAccountOpt.isPresent()) {
-                    localAccount = localAccountOpt.get();
-                } else {
-                    throw new IllegalArgumentException("Local account not found: " + localAccountId);
-                }
+            TxAccountDTO account = posting.getAccount();
+            if ("ACCOUNT".equals(account.getType())) {
+                String accountId = account.getNum();
+                if (accountId != null && accountId.startsWith(config.getRoutingNumber())) {
+                    localAccountId = accountId;
+                    amount = posting.getAmount();
+                    System.out.println("AMOUNT: " + amount);
 
-                if (posting.getAsset() instanceof MonetaryAssetDTO) {
-                    MonetaryAssetDTO asset = (MonetaryAssetDTO) posting.getAsset();
-                    if (asset.getAsset() instanceof CurrencyAsset) {
-                        CurrencyType currencyType = CurrencyType.fromString(((CurrencyAsset) asset.getAsset()).getCurrency());
-                        Optional<Currency> currencyOpt = currencyRepository.findByCode(currencyType);
-                        if (currencyOpt.isPresent()) {
-                            localCurrency = currencyOpt.get();
+                    Optional<Account> localAccountOpt = accountRepository.findByAccountNumber(localAccountId);
+                    if (localAccountOpt.isPresent()) {
+                        localAccount = localAccountOpt.get();
+                    } else {
+                        throw new IllegalArgumentException("Local account not found: " + localAccountId);
+                    }
+
+                    if (posting.getAsset() instanceof MonetaryAssetDTO asset) {
+                        if (asset.getAsset() != null) {
+                            CurrencyType currencyType = CurrencyType.fromString(asset.getAsset().getCurrency());
+                            Optional<Currency> currencyOpt = currencyRepository.findByCode(currencyType);
+                            if (currencyOpt.isPresent()) {
+                                localCurrency = currencyOpt.get();
+                            } else {
+                                throw new IllegalArgumentException("Currency not found: " + currencyType);
+                            }
                         } else {
-                            throw new IllegalArgumentException("Currency not found: " + currencyType);
+                            throw new IllegalArgumentException("Invalid asset type");
                         }
                     } else {
                         throw new IllegalArgumentException("Invalid asset type");
                     }
-                } else {
-                    throw new IllegalArgumentException("Invalid asset type");
                 }
-
-
             }
         }
 
@@ -282,18 +330,19 @@ public class InterbankService implements InterbankOperationService {
             throw new IllegalArgumentException("Local account not found");
         }
 
-        Transfer transfer = transferService.receiveForeignBankTransfer(
-                localAccount.getAccountNumber(),
-                amount,
-                originalMessage.getMessage(),
-                "Banka 4",
-                localCurrency
-        );
+        Transfer transfer =
+                transferService.receiveForeignBankTransfer(
+                        localAccount.getAccountNumber(),
+                        amount,
+                        originalMessage.getMessage(),
+                        "Banka 4",
+                        localCurrency);
 
         if (transfer == null) {
             throw new IllegalArgumentException("Failed to create transfer");
         }
     }
+
 
     public VoteDTO handleNewTXRequest(InterbankMessageDTO<InterbankTransactionDTO> messageDto) {
         // check if all postings are monetary
@@ -304,7 +353,7 @@ public class InterbankService implements InterbankOperationService {
 
             String currencyCode = null;
 
-            if (postings == null || postings.isEmpty() || postings.size() != 2) {
+            if (postings == null || postings.size() != 2) {
                 response.setVote("NO");
                 response.setReasons(List.of(new VoteReasonDTO("NO_POSTINGS", null)));
                 return response;
@@ -312,11 +361,10 @@ public class InterbankService implements InterbankOperationService {
 
             String localAcountId = null;
 
-            Boolean forwardToTradingService = false;
+            boolean forwardToTradingService = false;
 
             for (PostingDTO posting : postings) {
-                if (posting.getAsset() instanceof MonetaryAssetDTO) {
-                    MonetaryAssetDTO asset = (MonetaryAssetDTO) posting.getAsset();
+                if (posting.getAsset() instanceof MonetaryAssetDTO asset) {
                     if (asset.getAsset().getCurrency() == null) {
                         response.setVote("NO");
                         response.setReasons(List.of(new VoteReasonDTO("NO_SUCH_ASSET", posting)));
@@ -334,43 +382,50 @@ public class InterbankService implements InterbankOperationService {
                     }
 
                     TxAccountDTO account = posting.getAccount();
-                    if (account.getId() == null) {
-                        response.setVote("NO");
-                        response.setReasons(List.of(new VoteReasonDTO("NO_SUCH_ACCOUNT", posting)));
-                        System.out.println("No account id for posting");
-                        return response;
-                    }
 
-                    if (account.getId().getUserId() == null || account.getId().getUserId().isEmpty()) {
-                        response.setVote("NO");
-                        response.setReasons(List.of(new VoteReasonDTO("NO_SUCH_ACCOUNT", posting)));
-                        System.out.println("No account id for posting #2");
-                        return response;
-                    }
-
-                    System.out.println("Account id: " + account.getId().getUserId() + " routing number: " + account.getId().getRoutingNumber() + " config routing number: " + config.getRoutingNumber());
-                    if (account.getId().getRoutingNumber().equalsIgnoreCase(config.getRoutingNumber())) {
-                        localAcountId = account.getId().getUserId();
-                    }
-
-                    if (posting.getAmount() < 0 && account.getId().getRoutingNumber() == config.getRoutingNumber()) {
-                        response.setVote("NO");
-                        response.setReasons(List.of(new VoteReasonDTO("UNBALANCED_TX", posting)));
-                        return response;
+                    switch (account.getType()) {
+                        case "PERSON", "OPTION" -> {
+                            if (account.getId() == null
+                                    || account.getId().getId() == null
+                                    || account.getId().getId().isEmpty()) {
+                                response.setVote("NO");
+                                response.setReasons(
+                                        List.of(
+                                                new VoteReasonDTO(
+                                                        "INVALID_POSTING_FORMAT", posting)));
+                                return response;
+                            }
+                        }
+                        case "ACCOUNT" -> {
+                            String accountId = account.getNum();
+                            if (accountId == null) {
+                                response.setVote("NO");
+                                response.setReasons(
+                                        List.of(new VoteReasonDTO("NO_SUCH_ACCOUNT", posting)));
+                                System.out.println("No account number for posting");
+                                return response;
+                            }
+                            if (!accountId.startsWith(config.getRoutingNumber())) {
+                                continue;
+                            }
+                            localAcountId = accountId;
+                        }
                     }
                 } else {
                     forwardToTradingService = true;
                 }
             }
-
-            // if any of the assets is not monetary, forward to trading service and wait for response
+            log.info("Local account id: {}", localAcountId);
+            // if any of the assets is not monetary, forward to trading service and wait for
+            // response
             if (forwardToTradingService) {
                 response = forwardNewTX(messageDto);
                 return response;
             }
 
             // check if the local account exists
-            Optional<Account> localAccountOpt = accountRepository.findByAccountNumber(localAcountId);
+            Optional<Account> localAccountOpt =
+                    accountRepository.findByAccountNumber(localAcountId);
             if (localAccountOpt.isEmpty()) {
                 System.out.println("No such account: " + localAcountId);
                 response.setVote("NO");
@@ -378,13 +433,11 @@ public class InterbankService implements InterbankOperationService {
                 return response;
             }
 
-            Account localAccount = localAccountOpt.get();
-
             response.setVote("YES");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to handle new transaction request: " + e.getMessage());
+            throw new RuntimeException(
+                    "Failed to handle new transaction request: " + e.getMessage());
         }
-
         return response;
     }
 
@@ -396,17 +449,20 @@ public class InterbankService implements InterbankOperationService {
         switch (type) {
             case NEW_TX -> {
                 if (!(message instanceof InterbankTransactionDTO)) {
-                    throw new IllegalArgumentException("Expected InterbankTransactionDTO for NEW_TX");
+                    throw new IllegalArgumentException(
+                            "Expected InterbankTransactionDTO for NEW_TX");
                 }
             }
             case COMMIT_TX -> {
                 if (!(message instanceof CommitTransactionDTO)) {
-                    throw new IllegalArgumentException("Expected CommitTransactionDTO for COMMIT_TX");
+                    throw new IllegalArgumentException(
+                            "Expected CommitTransactionDTO for COMMIT_TX");
                 }
             }
             case ROLLBACK_TX -> {
                 if (!(message instanceof RollbackTransactionDTO)) {
-                    throw new IllegalArgumentException("Expected RollbackTransactionDTO for ROLLBACK_TX");
+                    throw new IllegalArgumentException(
+                            "Expected RollbackTransactionDTO for ROLLBACK_TX");
                 }
             }
             default -> throw new IllegalArgumentException("Unknown message type");
@@ -415,26 +471,34 @@ public class InterbankService implements InterbankOperationService {
 
     @Override
     public void sendCommit(Event event) {
-        System.out.println("Sending commit for event: " + event.getId());
-
-        InterbankMessageDTO<CommitTransactionDTO> message = new InterbankMessageDTO<>();
-        message.setMessageType(InterbankMessageType.COMMIT_TX);
-        IdempotenceKey idempotenceKey = generateIdempotenceKey(message);
-        message.setIdempotenceKey(idempotenceKey);
-
-        CommitTransactionDTO commitTransactionDTO = new CommitTransactionDTO();
-        commitTransactionDTO.setTransactionId(event.getIdempotenceKey());
-
-        message.setMessage(commitTransactionDTO);
-
-
-
+        var originalMessage = event.getPayload();
         try {
-            Thread.sleep(1000);
-            sendInterbankMessage(message, config.getInterbankTargetUrl());
+            InterbankMessageDTO<InterbankTransactionDTO> originalNewTxMessage =
+                    objectMapper.readValue(
+                            event.getPayload(),
+                            objectMapper
+                                    .getTypeFactory()
+                                    .constructParametricType(
+                                            InterbankMessageDTO.class,
+                                            InterbankTransactionDTO.class));
+            log.info("Original message: {}", originalMessage);
+            System.out.println("Sending commit for event: " + event.getId());
+
+            InterbankMessageDTO<CommitTransactionDTO> message = new InterbankMessageDTO<>();
+            message.setMessageType(InterbankMessageType.COMMIT_TX);
+            IdempotenceKey idempotenceKey = generateIdempotenceKey(message);
+            message.setIdempotenceKey(idempotenceKey);
+
+            CommitTransactionDTO commitTransactionDTO = new CommitTransactionDTO();
+            commitTransactionDTO.setTransactionId(
+                    originalNewTxMessage.getMessage().getTransactionId());
+
+            message.setMessage(commitTransactionDTO);
 
             transferService.commitForeignBankTransfer(event.getIdempotenceKey());
-        } catch (InterruptedException e) {
+
+            sendInterbankMessage(message, config.getInterbankTargetUrl());
+        } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
     }
@@ -449,7 +513,10 @@ public class InterbankService implements InterbankOperationService {
         message.setIdempotenceKey(idempotenceKey);
 
         RollbackTransactionDTO rollbackTransactionDTO = new RollbackTransactionDTO();
-        rollbackTransactionDTO.setTransactionId(event.getIdempotenceKey());
+        rollbackTransactionDTO.setTransactionId(
+                new ForeignBankIdDTO(
+                        event.getIdempotenceKey().getRoutingNumber(),
+                        event.getIdempotenceKey().getLocallyGeneratedKey()));
 
         message.setMessage(rollbackTransactionDTO);
 
@@ -472,13 +539,13 @@ public class InterbankService implements InterbankOperationService {
         }
 
         try {
-            HttpResponse<String> response = requestService.send(
-                    new RequestBuilder()
-                            .method("POST")
-                            .url(config.getTradingServiceUrl())
-                            .body(jsonString)
-                            .addHeader("Content-Type", "application/json")
-            );
+            HttpResponse<String> response =
+                    requestService.send(
+                            new RequestBuilder()
+                                    .method("POST")
+                                    .url(config.getTradingServiceUrl())
+                                    .body(jsonString)
+                                    .addHeader("Content-Type", "application/json"));
 
             VoteDTO voteDTO = objectMapper.readValue(response.body(), VoteDTO.class);
             if (voteDTO == null) {
@@ -491,7 +558,8 @@ public class InterbankService implements InterbankOperationService {
 
             return voteDTO;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to forward message to trading service: " + e.getMessage());
+            throw new RuntimeException(
+                    "Failed to forward message to trading service: " + e.getMessage());
         }
     }
 
@@ -505,13 +573,13 @@ public class InterbankService implements InterbankOperationService {
         }
 
         try {
-            HttpResponse<String> response = requestService.send(
-                    new RequestBuilder()
-                            .method("POST")
-                            .url(config.getTradingServiceUrl())
-                            .body(jsonString)
-                            .addHeader("Content-Type", "application/json")
-            );
+            HttpResponse<String> response =
+                    requestService.send(
+                            new RequestBuilder()
+                                    .method("POST")
+                                    .url(config.getTradingServiceUrl())
+                                    .body(jsonString)
+                                    .addHeader("Content-Type", "application/json"));
 
             VoteDTO voteDTO = objectMapper.readValue(response.body(), VoteDTO.class);
             if (voteDTO == null) {
@@ -524,7 +592,8 @@ public class InterbankService implements InterbankOperationService {
 
             return voteDTO;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to forward message to trading service: " + e.getMessage());
+            throw new RuntimeException(
+                    "Failed to forward message to trading service: " + e.getMessage());
         }
     }
 }

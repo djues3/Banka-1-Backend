@@ -1,14 +1,15 @@
 package com.banka1.user.controllers;
 
+import com.banka1.common.model.Permission;
 import com.banka1.user.DTO.request.CreateCustomerRequest;
 import com.banka1.user.DTO.request.UpdateCustomerRequest;
 import com.banka1.user.DTO.request.UpdatePermissionsRequest;
 import com.banka1.user.aspect.Authorization;
 import com.banka1.user.model.Customer;
-import com.banka1.common.model.Permission;
-import com.banka1.user.service.CustomerService;
 import com.banka1.user.service.AuthService;
+import com.banka1.user.service.CustomerService;
 import com.banka1.user.utils.ResponseTemplate;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -16,6 +17,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -94,6 +96,16 @@ public class CustomerController {
         } catch (Exception e) {
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.BAD_REQUEST), false, null, e.getMessage());
         }
+    }
+    // TODO: add authorization
+    @GetMapping("/111/{id}")
+    public ResponseEntity<?> findById(@PathVariable Long id) {
+        var customer = customerService.findById(id);
+        if (customer == null) {
+            return ResponseEntity.notFound().build();
+        }
+        var userInfo = new UserInfo("Bank 1", customer.getFirstName() + " " + customer.getLastName());
+        return ResponseEntity.ok(userInfo);
     }
 
     @PostMapping
@@ -277,5 +289,7 @@ public class CustomerController {
         }
 
     }
+
+    record UserInfo(String bankDisplayName, String displayName) {}
 
 }

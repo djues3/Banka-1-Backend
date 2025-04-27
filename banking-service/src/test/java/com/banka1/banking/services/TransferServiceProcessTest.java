@@ -13,6 +13,7 @@ import org.mockito.*;
 import org.springframework.jms.core.JmsTemplate;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -44,6 +45,8 @@ class TransferServiceProcessTest {
     @InjectMocks
     private TransferService service;
 
+    private final UUID uuid = UUID.randomUUID();
+
     @BeforeEach
     void init() {
         // destinationEmail is irrelevant for the tests – just pass a dummy value
@@ -65,18 +68,18 @@ class TransferServiceProcessTest {
         acc.setCurrencyType(CurrencyType.RSD);
 
         Transfer t = new Transfer();
-        t.setId(42L);
+        t.setId(uuid);
         t.setAmount(100.0);
         t.setStatus(TransferStatus.RESERVED);
         t.setType(TransferType.FOREIGN_BANK);
         t.setFromAccountId(acc);
 
-        when(transferRepo.findById(42L)).thenReturn(Optional.of(t));
+        when(transferRepo.findById(uuid)).thenReturn(Optional.of(t));
         when(accountRepo.save(any(Account.class))).thenReturn(acc);
         when(transferRepo.save(any(Transfer.class))).thenAnswer(i -> i.getArgument(0));
 
         /* ---------- act ---------- */
-        String result = service.processTransfer(42L);
+        String result = service.processTransfer(uuid);
 
         /* ---------- assert ---------- */
         assertEquals("Transfer reserved successfully", result);
@@ -101,7 +104,7 @@ class TransferServiceProcessTest {
         Currency rsd = mock(Currency.class);
 
         Transfer t = new Transfer();
-        t.setId(99L);
+        t.setId(uuid);
         t.setAmount(100.0);
         t.setStatus(TransferStatus.PENDING);
         t.setType(TransferType.INTERNAL);
@@ -109,12 +112,12 @@ class TransferServiceProcessTest {
         t.setToAccountId(to);
         t.setFromCurrency(rsd);
 
-        when(transferRepo.findById(99L)).thenReturn(Optional.of(t));
+        when(transferRepo.findById(uuid)).thenReturn(Optional.of(t));
         when(transferRepo.save(any(Transfer.class))).thenAnswer(i -> i.getArgument(0));
 
         /* ---------- act / assert ---------- */
         RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> service.processTransfer(99L));
+                () -> service.processTransfer(uuid));
 
         assertTrue(ex.getMessage().toLowerCase().contains("insufficient"));
     }

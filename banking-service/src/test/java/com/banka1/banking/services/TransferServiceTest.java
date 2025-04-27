@@ -96,6 +96,12 @@ public class TransferServiceTest {
     private Transfer pendingTransfer;
     private Company bankCompany;
 
+    private final UUID pendingId = UUID.randomUUID();
+    private final UUID internalId = UUID.randomUUID();
+    private final UUID foreignId = UUID.randomUUID();
+    private final UUID externalId = UUID.randomUUID();
+    private final UUID exchangeId = UUID.randomUUID();
+
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(transferService, "destinationEmail", "email.queue");
@@ -182,7 +188,7 @@ public class TransferServiceTest {
 
         // Setup pending transfer
         pendingTransfer = new Transfer();
-        pendingTransfer.setId(1L);
+        pendingTransfer.setId(pendingId);
         pendingTransfer.setFromAccountId(fromAccountUSD);
         pendingTransfer.setToAccountId(toAccount);
         pendingTransfer.setAmount(100.0);
@@ -191,7 +197,7 @@ public class TransferServiceTest {
 
         // Setup internal transfer
         internalTransfer = new Transfer();
-        internalTransfer.setId(1L);
+        internalTransfer.setId(internalId);
         internalTransfer.setFromAccountId(fromAccountUSD);
         internalTransfer.setToAccountId(toAccount);
         internalTransfer.setAmount(100.0);
@@ -202,7 +208,7 @@ public class TransferServiceTest {
 
         // Setup external transfer
         externalTransfer = new Transfer();
-        externalTransfer.setId(2L);
+        externalTransfer.setId(externalId);
         externalTransfer.setFromAccountId(fromAccountUSD);
         externalTransfer.setToAccountId(toAccount);
         externalTransfer.setAmount(100.0);
@@ -212,7 +218,7 @@ public class TransferServiceTest {
         externalTransfer.setToCurrency(usdCurrency);
 
         foreignTransfer = new Transfer();
-        foreignTransfer.setId(3L);
+        foreignTransfer.setId(foreignId);
         foreignTransfer.setFromAccountId(fromAccountUSD);
         foreignTransfer.setToAccountId(toAccountForeign);
         foreignTransfer.setAmount(100.0);
@@ -222,7 +228,7 @@ public class TransferServiceTest {
         foreignTransfer.setToCurrency(eurCurrency);
 
         exchangeTransfer = new Transfer();
-        exchangeTransfer.setId(4L);
+        exchangeTransfer.setId(exchangeId);
         exchangeTransfer.setFromAccountId(fromAccountForeign);
         exchangeTransfer.setToAccountId(fromAccountUSD);
         exchangeTransfer.setAmount(100.0);
@@ -250,16 +256,16 @@ public class TransferServiceTest {
         when(userServiceCustomer.getCustomerById(100L)).thenReturn(customerDTO);
         when(transferRepository.saveAndFlush(any(Transfer.class))).thenAnswer(invocation -> {
             Transfer t = invocation.getArgument(0);
-            t.setId(1L);
+            t.setId(pendingId);
             return t;
         });
-        when(otpTokenService.generateOtp(1L)).thenReturn("123456");
+        when(otpTokenService.generateOtp(pendingId)).thenReturn("123456");
 
         // Execute
-        Long result = transferService.createInternalTransfer(dto);
+        UUID result = transferService.createInternalTransfer(dto);
 
         // Verify
-        assertEquals(1L, result);
+        assertEquals(pendingId, result);
 
         // Verify transfer was created and saved
         ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
@@ -274,7 +280,7 @@ public class TransferServiceTest {
         assertEquals(usdCurrency, savedTransfer.getToCurrency());
 
         // Verify OTP was generated and set
-        verify(otpTokenService).generateOtp(1L);
+        verify(otpTokenService).generateOtp(pendingId);
         verify(transferRepository).save(transferCaptor.capture());
         assertEquals("123456", transferCaptor.getValue().getOtp());
 
@@ -308,16 +314,16 @@ public class TransferServiceTest {
         when(userServiceCustomer.getCustomerById(100L)).thenReturn(customerDTO);
         when(transferRepository.saveAndFlush(any(Transfer.class))).thenAnswer(invocation -> {
             Transfer t = invocation.getArgument(0);
-            t.setId(1L);
+            t.setId(pendingId);
             return t;
         });
-        when(otpTokenService.generateOtp(1L)).thenReturn("123456");
+        when(otpTokenService.generateOtp(pendingId)).thenReturn("123456");
 
         // Execute
-        Long result = transferService.createMoneyTransfer(dto);
+        UUID result = transferService.createMoneyTransfer(dto);
 
         // Verify
-        assertEquals(1L, result);
+        assertEquals(pendingId, result);
 
         // Verify transfer was created and saved
         ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
@@ -335,7 +341,7 @@ public class TransferServiceTest {
         assertEquals("Payment for services", savedTransfer.getPaymentDescription());
 
         // Verify OTP was generated and set
-        verify(otpTokenService).generateOtp(1L);
+        verify(otpTokenService).generateOtp(pendingId);
         verify(transferRepository).save(transferCaptor.capture());
         assertEquals("123456", transferCaptor.getValue().getOtp());
 
@@ -371,14 +377,14 @@ public class TransferServiceTest {
         when(userServiceCustomer.getCustomerById(100L)).thenReturn(customerDTO);
         when(transferRepository.saveAndFlush(any(Transfer.class))).thenAnswer(invocation -> {
             Transfer t = invocation.getArgument(0);
-            t.setId(1L);
+            t.setId(pendingId);
             return t;
         });
-        when(otpTokenService.generateOtp(1L)).thenReturn("123456");
+        when(otpTokenService.generateOtp(pendingId)).thenReturn("123456");
 
-        Long result = transferService.createMoneyTransfer(dto);
+        UUID result = transferService.createMoneyTransfer(dto);
 
-        assertEquals(1L, result);
+        assertEquals(pendingId, result);
 
         ArgumentCaptor<Transfer> transferCaptor = ArgumentCaptor.forClass(Transfer.class);
         verify(transferRepository).saveAndFlush(transferCaptor.capture());
@@ -396,7 +402,7 @@ public class TransferServiceTest {
         when(accountRepository.findByAccountNumber("111111111")).thenReturn(Optional.empty());
         when(accountRepository.findByAccountNumber("987654321")).thenReturn(Optional.of(toAccount));
 
-        Long result = transferService.createMoneyTransfer(dto);
+        UUID result = transferService.createMoneyTransfer(dto);
 
         assertNull(result);
         verify(transferRepository, never()).saveAndFlush(any(Transfer.class));
@@ -480,28 +486,29 @@ public class TransferServiceTest {
 
     @Test
     void testFindById_Success() {
-        when(transferRepository.findById(1L)).thenReturn(Optional.of(pendingTransfer));
+        when(transferRepository.findById(pendingId)).thenReturn(Optional.of(pendingTransfer));
 
-        Transfer result = transferService.findById(1L);
+        Transfer result = transferService.findById(pendingId);
 
         assertNotNull(result);
-        assertEquals(1L, result.getId());
+        assertEquals(pendingId, result.getId());
     }
 
     @Test
     void testFindById_NotFound() {
-        when(transferRepository.findById(999L)).thenReturn(Optional.empty());
+        var notFound = UUID.randomUUID();
+        when(transferRepository.findById(notFound)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> transferService.findById(999L));
+        assertThrows(RuntimeException.class, () -> transferService.findById(notFound));
     }
 
     @Test
     void testProcessTransfer_Internal() {
-        when(transferRepository.findById(1L)).thenReturn(Optional.of(internalTransfer));
+        when(transferRepository.findById(pendingId)).thenReturn(Optional.of(internalTransfer));
         when(accountRepository.save(any(Account.class))).thenReturn(null);
         when(transactionRepository.save(any(Transaction.class))).thenReturn(null);
 
-        String result = transferService.processTransfer(1L);
+        String result = transferService.processTransfer(pendingId);
 
         assertEquals("Transfer completed successfully", result);
         assertEquals(TransferStatus.COMPLETED, internalTransfer.getStatus());
@@ -512,7 +519,7 @@ public class TransferServiceTest {
 
     @Test
     void testProcessTransfer_Exchange() {
-        when(transferRepository.findById(4L)).thenReturn(Optional.of(exchangeTransfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(exchangeTransfer));
         when(accountRepository.save(any(Account.class))).thenReturn(null);
         when(transactionRepository.save(any(Transaction.class))).thenReturn(null);
         when(userServiceCustomer.getCustomerById(100L)).thenReturn(customerDTO);
@@ -540,7 +547,7 @@ public class TransferServiceTest {
         when(bankAccountUtils.getBankAccountForCurrency(usdCurrency.getCode())).thenReturn(bankAccountUSD);
         when(bankAccountUtils.getBankAccountForCurrency(CurrencyType.RSD)).thenReturn(bankAccountRSD);
 
-        String result = transferService.processTransfer(4L);
+        String result = transferService.processTransfer(exchangeId);
 
         assertEquals("Transfer completed successfully", result);
         assertEquals(TransferStatus.COMPLETED, exchangeTransfer.getStatus());
@@ -553,11 +560,11 @@ public class TransferServiceTest {
 
     @Test
     void testProcessTransfer_External() {
-        when(transferRepository.findById(2L)).thenReturn(Optional.of(externalTransfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(externalTransfer));
         when(accountRepository.save(any(Account.class))).thenReturn(null);
         when(transactionRepository.save(any(Transaction.class))).thenReturn(null);
 
-        String result = transferService.processTransfer(2L);
+        String result = transferService.processTransfer(exchangeId);
 
         assertEquals("Transfer completed successfully", result);
         assertEquals(TransferStatus.COMPLETED, externalTransfer.getStatus());
@@ -568,7 +575,7 @@ public class TransferServiceTest {
 
     @Test
     void testProcessTransfer_Foreign() {
-        when(transferRepository.findById(3L)).thenReturn(Optional.of(foreignTransfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(foreignTransfer));
         when(accountRepository.save(any(Account.class))).thenReturn(null);
         when(transactionRepository.save(any(Transaction.class))).thenReturn(null);
         when(userServiceCustomer.getCustomerById(200L)).thenReturn(customerDTO2);
@@ -590,7 +597,7 @@ public class TransferServiceTest {
         when(bankAccountUtils.getBankAccountForCurrency(rsdCurrency.getCode())).thenReturn(bankAccountRSD);
 
 
-        String result = transferService.processTransfer(3L);
+        String result = transferService.processTransfer(exchangeId);
 
         assertEquals("Transfer completed successfully", result);
         assertEquals(TransferStatus.COMPLETED, foreignTransfer.getStatus());
@@ -605,9 +612,9 @@ public class TransferServiceTest {
         fromAccountUSD.setBalance(50.0);
         internalTransfer.setAmount(100.0);
 
-        when(transferRepository.findById(1L)).thenReturn(Optional.of(internalTransfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(internalTransfer));
 
-        assertThrows(RuntimeException.class, () -> transferService.processInternalTransfer(1L));
+        assertThrows(RuntimeException.class, () -> transferService.processInternalTransfer(exchangeId));
         assertEquals(TransferStatus.FAILED, internalTransfer.getStatus());
     }
 
@@ -616,9 +623,9 @@ public class TransferServiceTest {
         fromAccountUSD.setBalance(50.0);
         externalTransfer.setAmount(100.0);
 
-        when(transferRepository.findById(2L)).thenReturn(Optional.of(externalTransfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(externalTransfer));
 
-        assertThrows(RuntimeException.class, () -> transferService.processExternalTransfer(2L));
+        assertThrows(RuntimeException.class, () -> transferService.processExternalTransfer(exchangeId));
         assertEquals(TransferStatus.FAILED, externalTransfer.getStatus());
     }
 
@@ -744,24 +751,23 @@ public class TransferServiceTest {
 
     @Test
     void testSomethingUsingProcessForeignBankTransfer() {
-        Long transferId = 1L;
         Account fromAccount = new Account();
         fromAccount.setBalance(1000.0);
         fromAccount.setReservedBalance(0.0);
 
         Transfer transfer = new Transfer();
-        transfer.setId(transferId);
+        transfer.setId(exchangeId);
         transfer.setAmount(200.0);
         transfer.setFromAccountId(fromAccount);
         transfer.setStatus(TransferStatus.RESERVED);
         transfer.setType(TransferType.FOREIGN_BANK);
 
-        when(transferRepository.findById(transferId)).thenReturn(Optional.of(transfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(transfer));
         when(accountRepository.save(any(Account.class))).thenReturn(fromAccount);
         when(transferRepository.save(any(Transfer.class))).thenReturn(transfer);
 
         // Act
-        String result = transferService.processForeignBankTransfer(transferId);
+        String result = transferService.processForeignBankTransfer(exchangeId);
 
         // Assert
         assertEquals("Transfer reserved successfully", result);
@@ -773,24 +779,23 @@ public class TransferServiceTest {
     @Test
     void testProcessForeignBankTransfer_FailsDueToInsufficientBalance() {
         // Arrange
-        Long transferId = 1L;
 
         Account fromAccount = new Account();
         fromAccount.setBalance(100.0); // less than amount
         fromAccount.setReservedBalance(0.0);
 
         Transfer transfer = new Transfer();
-        transfer.setId(transferId);
+        transfer.setId(exchangeId);
         transfer.setAmount(200.0); // more than available balance
         transfer.setFromAccountId(fromAccount);
         transfer.setStatus(TransferStatus.RESERVED);
         transfer.setType(TransferType.FOREIGN_BANK);
 
-        when(transferRepository.findById(transferId)).thenReturn(Optional.of(transfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(transfer));
 
         // Act + Assert
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            transferService.processForeignBankTransfer(transferId);
+            transferService.processForeignBankTransfer(exchangeId);
         });
 
         assertEquals("Insufficient balance for transfer", exception.getMessage());
@@ -815,13 +820,13 @@ public class TransferServiceTest {
         fromAccount.setReservedBalance(0.0);
 
         Transfer transfer = new Transfer();
-        transfer.setId(transferId);
+        transfer.setId(exchangeId);
         transfer.setAmount(200.0);  // Transfer amount
         transfer.setFromAccountId(fromAccount);
         transfer.setStatus(TransferStatus.RESERVED);
         transfer.setType(TransferType.FOREIGN_BANK);
 
-        when(transferRepository.findById(transferId)).thenReturn(Optional.of(transfer));
+        when(transferRepository.findById(exchangeId)).thenReturn(Optional.of(transfer));
         when(accountRepository.save(any())).thenReturn(fromAccount);
 
         // Simulate an exception in the interbankService.sendNewTXMessage method
@@ -830,12 +835,12 @@ public class TransferServiceTest {
 
         // Act
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            transferService.processForeignBankTransfer(transferId);
+            transferService.processForeignBankTransfer(exchangeId);
         });
 
         // Assert
         assertEquals("Transfer processing failed", exception.getMessage());
-        assertTrue(exception.getCause() instanceof RuntimeException);
+        assertInstanceOf(RuntimeException.class, exception.getCause());
         assertEquals("Simulated error during processing", exception.getCause().getMessage());
 
         // Verify transfer status was updated to FAILED and note was added
@@ -874,7 +879,7 @@ public class TransferServiceTest {
         customerDTO.setFirstName("Miki");
 
         Transfer savedTransfer = new Transfer(); // mock return from save
-        savedTransfer.setId(1L);
+        savedTransfer.setId(exchangeId);
 
         when(currencyRepository.findByCode(CurrencyType.USD)).thenReturn(Optional.of(currency));
         when(userServiceCustomer.getCustomerById(123L)).thenReturn(customerDTO);
@@ -974,7 +979,7 @@ public class TransferServiceTest {
     void testCommitForeignBankTransfer_success() {
         Long transferId = 1L;
         IdempotenceKey key = new IdempotenceKey();
-        key.setLocallyGeneratedKey(String.valueOf(transferId));
+        key.setLocallyGeneratedKey(String.valueOf(pendingId));
 
         Account mockAccount = new Account();
         mockAccount.setReservedBalance(1000.0);
@@ -984,13 +989,13 @@ public class TransferServiceTest {
         currency.setName("USD");
 
         Transfer mockTransfer = new Transfer();
-        mockTransfer.setId(transferId);
+        mockTransfer.setId(pendingId);
         mockTransfer.setAmount(500.0);
         mockTransfer.setStatus(TransferStatus.RESERVED);
         mockTransfer.setFromAccountId(mockAccount);
         mockTransfer.setFromCurrency(currency);
 
-        when(transferRepository.findById(transferId)).thenReturn(Optional.of(mockTransfer));
+        when(transferRepository.findById(pendingId)).thenReturn(Optional.of(mockTransfer));
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(transferRepository.save(any(Transfer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1002,21 +1007,20 @@ public class TransferServiceTest {
 
     @Test
     void testRollbackForeignBankTransfer_success() {
-        Long transferId = 1L;
         IdempotenceKey key = new IdempotenceKey();
-        key.setLocallyGeneratedKey(String.valueOf(transferId));
+        key.setLocallyGeneratedKey(String.valueOf(pendingId));
 
         Account mockAccount = new Account();
         mockAccount.setReservedBalance(1000.0);
         mockAccount.setBalance(2000.0);
 
         Transfer mockTransfer = new Transfer();
-        mockTransfer.setId(transferId);
+        mockTransfer.setId(pendingId);
         mockTransfer.setAmount(500.0);
         mockTransfer.setStatus(TransferStatus.RESERVED);
         mockTransfer.setFromAccountId(mockAccount);
 
-        when(transferRepository.findById(transferId)).thenReturn(Optional.of(mockTransfer));
+        when(transferRepository.findById(pendingId)).thenReturn(Optional.of(mockTransfer));
         when(transferRepository.save(any(Transfer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Transfer result = transferService.rollbackForeignBankTransfer(key);
@@ -1043,7 +1047,7 @@ public class TransferServiceTest {
         when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(transferRepository.save(any(Transfer.class))).thenAnswer(invocation -> {
             Transfer t = invocation.getArgument(0);
-            t.setId(42L); // mock ID generation
+            t.setId(exchangeId); // mock ID generation
             return t;
         });
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
