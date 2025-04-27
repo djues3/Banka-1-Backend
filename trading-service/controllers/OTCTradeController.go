@@ -578,13 +578,104 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 		return ctx.Status(500).JSON(types.Response{false, "", "Greška pri ažuriranju ponude"})
 	}
 
+	userIDStr := strconv.FormatUint(uint64(userID), 10)
+
+	const myRouting = 111
+	composite := fmt.Sprintf("%d%s", myRouting, userIDStr)
+	if *trade.RemoteBuyerID == composite {
+
+		buyerID := int64(userID)
+
+		buyerAccounts, err := broker.GetAccountsForUser(buyerID)
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+				Success: false,
+				Error:   "Neuspešno dohvatanje računa kupca",
+			})
+		}
+		var buyerAccountID int64 = -1
+		var ourAccountNumber string
+		for _, acc := range buyerAccounts {
+			if acc.CurrencyType == "USD" {
+				buyerAccountID = acc.ID
+				ourAccountNumber = acc.AccountNumber
+				break
+			}
+		}
+		if buyerAccountID == -1 {
+			return ctx.Status(fiber.StatusBadRequest).JSON(types.Response{
+				Success: false,
+				Error:   "Kupac ili prodavac nema USD račun",
+			})
+		}
+		const theirRouting = 444
+		raw := *trade.RemoteSellerID
+		prefix := fmt.Sprintf("%d", theirRouting)
+		var sellerUserId string
+		if strings.HasPrefix(raw, prefix) {
+			sellerUserId = raw[len(prefix):]
+		} else {
+			sellerUserId = raw
+		}
+
+		idemp := dto.IdempotenceKeyDTO{
+			RoutingNumber:       myRouting,
+			LocallyGeneratedKey: fmt.Sprintf("premium-%d", time.Now().Unix()),
+		}
+		debit := dto.PostingDTO{
+			Account: dto.TxAccountDTO{
+				Type: "ACCOUNT",
+				Num:  &ourAccountNumber,
+			},
+			Amount: -trade.Premium,
+			Asset: dto.AssetDTO{
+				Type:  "MONAS",
+				Asset: toRaw(dto.MonetaryAssetDTO{Currency: "USD"}),
+			},
+		}
+		credit := dto.PostingDTO{
+			Account: dto.TxAccountDTO{
+				Type: "PERSON",
+				Id: &dto.ForeignBankIdDTO{
+					RoutingNumber: 444,
+					UserId:        sellerUserId,
+				},
+			},
+			Amount: trade.Premium,
+			Asset: dto.AssetDTO{
+				Type:  "MONAS",
+				Asset: toRaw(dto.MonetaryAssetDTO{Currency: "USD"}),
+			},
+		}
+		interbankMsg := dto.InterbankMessageDTO[dto.InterbankTransactionDTO]{
+			IdempotenceKey: idemp,
+			MessageType:    "NEW_TX",
+			Message: dto.InterbankTransactionDTO{
+				Postings:      []dto.PostingDTO{debit, credit},
+				Message:       "Premija za OTC ugovor",
+				TransactionId: dto.ForeignBankIdDTO{RoutingNumber: myRouting, UserId: idemp.LocallyGeneratedKey},
+			},
+		}
+		body, _ := json.Marshal(interbankMsg)
+		req, _ := http.NewRequest("POST", os.Getenv("BANKING_SERVICE_URL")+"/interbank/internal", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		// req.Header.Set("X-Api-Key", os.Getenv("INTERBANK_INCOMING_API_KEY"))
+
+		if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return ctx.Status(fiber.StatusBadGateway).JSON(types.Response{
+				Success: false,
+				Error:   "Greška pri plaćanju premije",
+			})
+		}
+	}
+
 	settleAt, err := time.Parse(time.RFC3339, off.SettlementDate)
 	if err != nil {
 		settleAt = trade.SettlementAt
 	}
 	contract := types.OptionContract{
 		OTCTradeID:          trade.ID,
-		RemoteContractID:    &off.ID.ID,
+		RemoteContractID:    trade.RemoteNegotiationID,
 		RemoteBuyerID:       trade.RemoteBuyerID,
 		RemoteSellerID:      trade.RemoteSellerID,
 		Quantity:            off.Amount,
@@ -634,81 +725,144 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 
 	if contract.RemoteContractID != nil {
 		ourRouting := 111
+		interRouting := 444
+
 		optID := *contract.RemoteContractID
-		negID := *contract.RemoteNegotiationID
 		qty := contract.Quantity
 		strike := contract.StrikePrice
-		settleAt := contract.SettlementAt.Format(time.RFC3339)
+
+		buyerID := int64(userID)
+
+		buyerAccounts, err := broker.GetAccountsForUser(buyerID)
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+				Success: false,
+				Error:   "Neuspešno dohvatanje računa kupca",
+			})
+		}
+		var buyerAccountID int64 = -1
+		var ourAccountNumber string
+		for _, acc := range buyerAccounts {
+			if acc.CurrencyType == "USD" {
+				buyerAccountID = acc.ID
+				ourAccountNumber = acc.AccountNumber
+				break
+			}
+		}
+		if buyerAccountID == -1 {
+			return ctx.Status(fiber.StatusBadRequest).JSON(types.Response{
+				Success: false,
+				Error:   "Kupac ili prodavac nema USD račun",
+			})
+		}
+		const theirRouting = 444
+		raw := *contract.RemoteSellerID
+		prefix := fmt.Sprintf("%d", theirRouting)
+		var sellerUserId string
+		if strings.HasPrefix(raw, prefix) {
+			sellerUserId = raw[len(prefix):]
+		} else {
+			sellerUserId = raw
+		}
 
 		idemp := dto.IdempotenceKeyDTO{
 			RoutingNumber:       ourRouting,
 			LocallyGeneratedKey: fmt.Sprintf("newtx-%d", time.Now().Unix()),
 		}
 
-		makePosting := func(amount float64, user string) dto.PostingDTO {
-			optDesc := dto.OptionDescriptionDTO{
-				ID:             dto.ForeignBankIdDTO{RoutingNumber: ourRouting, UserId: negID},
-				Stock:          dto.StockDescriptionDTO{Ticker: contract.Ticker},
-				PricePerUnit:   dto.MonetaryValueDTO{Currency: "USD", Amount: strike},
-				SettlementDate: settleAt,
-				Amount:         qty,
-			}
-			return dto.PostingDTO{
-				Account: dto.TxAccountDTO{
-					Type: "OPTION",
-					Id: &dto.ForeignBankIdDTO{
-						RoutingNumber: 111,
-						UserId:        user,
-					},
-				},
-				Amount: amount,
-				Asset: dto.AssetDTO{
-					Type:  "OPTION",
-					Asset: toRaw(optDesc),
-				},
-			}
+		debitOptionMoney := dto.PostingDTO{
+			Account: dto.TxAccountDTO{
+				Type: "ACCOUNT",
+				Num:  &ourAccountNumber,
+			},
+			Amount: -strike * float64(qty),
+			Asset: dto.AssetDTO{
+				Type:  "MONAS",
+				Asset: toRaw(dto.MonetaryAssetDTO{Currency: "USD"}),
+			},
 		}
 
-		seller := *contract.RemoteSellerID
-		buyer := *contract.RemoteBuyerID
+		creditOptionStock := dto.PostingDTO{
+			Account: dto.TxAccountDTO{
+				Type: "OPTION",
+				Id: &dto.ForeignBankIdDTO{
+					RoutingNumber: ourRouting,
+					UserId:        optID,
+				},
+			},
+			Amount: float64(qty),
+			Asset: dto.AssetDTO{
+				Type:  "STOCK",
+				Asset: toRaw(dto.StockDescriptionDTO{Ticker: contract.Ticker}),
+			},
+		}
+
+		debitBuyerStock := dto.PostingDTO{
+			Account: dto.TxAccountDTO{
+				Type: "PERSON",
+				Id: &dto.ForeignBankIdDTO{
+					RoutingNumber: interRouting,
+					UserId:        sellerUserId,
+				},
+			},
+			Amount: float64(qty),
+			Asset: dto.AssetDTO{
+				Type:  "STOCK",
+				Asset: toRaw(dto.StockDescriptionDTO{Ticker: contract.Ticker}),
+			},
+		}
+
+		creditSellerMoney := dto.PostingDTO{
+			Account: dto.TxAccountDTO{
+				Type: "PERSON",
+				Id: &dto.ForeignBankIdDTO{
+					RoutingNumber: interRouting,
+					UserId:        sellerUserId,
+				},
+			},
+			Amount: strike * float64(qty),
+			Asset: dto.AssetDTO{
+				Type:  "MONAS",
+				Asset: toRaw(dto.MonetaryAssetDTO{Currency: "USD"}),
+			},
+		}
 
 		interbankMsg := dto.InterbankMessageDTO[dto.InterbankTransactionDTO]{
 			IdempotenceKey: idemp,
 			MessageType:    "NEW_TX",
 			Message: dto.InterbankTransactionDTO{
-				Postings:      []dto.PostingDTO{makePosting(-float64(qty), seller), makePosting(+float64(qty), buyer)},
-				Message:       fmt.Sprintf("Rezervacija %d %s hartija pod %s", qty, contract.Ticker, optID),
-				TransactionId: dto.ForeignBankIdDTO{RoutingNumber: ourRouting, UserId: idemp.LocallyGeneratedKey},
+				Postings: []dto.PostingDTO{
+					debitOptionMoney,
+					creditOptionStock,
+					debitBuyerStock,
+					creditSellerMoney,
+				},
+				Message: fmt.Sprintf(
+					"Exercise %d %s under %s",
+					qty, contract.Ticker, optID,
+				),
+				TransactionId: dto.ForeignBankIdDTO{
+					RoutingNumber: ourRouting,
+					UserId:        idemp.LocallyGeneratedKey,
+				},
 			},
 		}
 
 		body, err := json.Marshal(interbankMsg)
-		fmt.Println(body)
 		if err != nil {
 			return ctx.Status(500).JSON(types.Response{false, "", "Greška pri serijalizaciji interbank poruke"})
 		}
+
 		url := os.Getenv("BANKING_SERVICE_URL") + "/interbank/internal"
 		req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		//req.Header.Set("X-Api-Key", os.Getenv("INTERBANK_INCOMING_API_KEY"))
+		// req.Header.Set("X-Api-Key", os.Getenv("INTERBANK_INCOMING_API_KEY"))
 
 		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
+		if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return ctx.Status(502).JSON(types.Response{false, "", "Greška pri slanju poruke bankingu"})
 		}
 		defer resp.Body.Close()
-
-		//type InterbankTxnRecord struct {
-		//	ID            uint      `gorm:"primaryKey"`
-		//	RoutingNumber int       `gorm:"not null;index"`
-		//	TransactionId string    `gorm:"not null;uniqueIndex:idx_txn"`
-		//	UserID        uint      `gorm:"not null"`
-		//	SecurityID    uint      `gorm:"not null"`
-		//	Quantity      int       `gorm:"not null"`
-		//	NeedsCredit   bool      `gorm:"not null;default:false"`
-		//	State         string    `gorm:"not null"`
-		//	CreatedAt     time.Time `gorm:"autoCreateTime"`
-		//}
 
 		ticker := contract.Ticker
 		var sec types.Security
@@ -720,6 +874,7 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 				Error:   fmt.Sprintf("Security '%s' nije pronađen", ticker),
 			})
 		}
+
 		rec := types.InterbankTxnRecord{
 			RoutingNumber: 111,
 			TransactionId: idemp.LocallyGeneratedKey,
@@ -733,12 +888,6 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 		if err := db.DB.Create(&rec).Error; err != nil {
 			log.Errorf("Ne mogu da snimim interbank tx record: %v", err)
 		}
-
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			b, _ := io.ReadAll(resp.Body)
-			return ctx.Status(resp.StatusCode).JSON(types.Response{false, "", fmt.Sprintf("Banking servis: %s", string(b))})
-		}
-
 		return ctx.JSON(types.Response{true, "Međubankarski ugovor prosleđen bankingu", ""})
 	}
 
@@ -1461,14 +1610,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 	routingStr := ctx.Params("routingNumber")
 	negID := ctx.Params("id")
 
-	routingNum, err := strconv.Atoi(routingStr)
-	if err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "Neispravan routingNumber",
-		})
-	}
-	fmt.Println(routingNum)
+	fmt.Println(routingStr)
 	var trade types.OTCTrade
 	if err := db.DB.
 		Where("remote_negotiation_id = ?", negID).
@@ -1486,15 +1628,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 		})
 	}
 
-	var actor string
-	if trade.ModifiedBy == *trade.RemoteBuyerID {
-		actor = *trade.RemoteSellerID
-	} else {
-		actor = *trade.RemoteBuyerID
-	}
-
 	trade.Status = "accepted"
-	trade.ModifiedBy = actor
 	if err := db.DB.Save(&trade).Error; err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
@@ -1502,10 +1636,90 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 		})
 	}
 
-	contractID := uuid.New().String()
+	ourRouting := 111
+	if strings.HasPrefix(*trade.RemoteBuyerID, strconv.Itoa(ourRouting)) {
+		buyerIDNumStr := (*trade.RemoteBuyerID)[len(strconv.Itoa(ourRouting)):]
+		buyerIDNum, _ := strconv.ParseUint(buyerIDNumStr, 10, 64)
+		accounts, err := broker.GetAccountsForUser(int64(buyerIDNum))
+		if err == nil {
+			var buyerAccountID int64 = -1
+			var ourAcctNum string
+			for _, acc := range accounts {
+				if acc.CurrencyType == "USD" {
+					buyerAccountID = acc.ID
+					ourAcctNum = acc.AccountNumber
+					break
+				}
+			}
+			if buyerAccountID == -1 {
+				return ctx.Status(fiber.StatusBadRequest).JSON(types.Response{
+					Success: false,
+					Error:   "Kupac ili prodavac nema USD račun",
+				})
+			}
+
+			if ourAcctNum != "" {
+				idemp := dto.IdempotenceKeyDTO{
+					RoutingNumber:       ourRouting,
+					LocallyGeneratedKey: fmt.Sprintf("premium-%d", time.Now().Unix()),
+				}
+				debit := dto.PostingDTO{
+					Account: dto.TxAccountDTO{
+						Type: "ACCOUNT",
+						Num:  &ourAcctNum,
+					},
+					Amount: -trade.Premium,
+					Asset: dto.AssetDTO{
+						Type:  "MONAS",
+						Asset: toRaw(dto.MonetaryAssetDTO{Currency: "USD"}),
+					},
+				}
+
+				sellerRaw := *trade.RemoteSellerID
+				prefix := "444"
+				var sellerUser string
+				if strings.HasPrefix(sellerRaw, prefix) {
+					sellerUser = sellerRaw[len(prefix):]
+				} else {
+					sellerUser = sellerRaw
+				}
+				credit := dto.PostingDTO{
+					Account: dto.TxAccountDTO{
+						Type: "PERSON",
+						Id: &dto.ForeignBankIdDTO{
+							RoutingNumber: 444,
+							UserId:        sellerUser,
+						},
+					},
+					Amount: trade.Premium,
+					Asset: dto.AssetDTO{
+						Type:  "MONAS",
+						Asset: toRaw(dto.MonetaryAssetDTO{Currency: "USD"}),
+					},
+				}
+				interbankMsg := dto.InterbankMessageDTO[dto.InterbankTransactionDTO]{
+					IdempotenceKey: idemp,
+					MessageType:    "NEW_TX",
+					Message: dto.InterbankTransactionDTO{
+						Postings:      []dto.PostingDTO{debit, credit},
+						Message:       "Premija za OTC ugovor",
+						TransactionId: dto.ForeignBankIdDTO{RoutingNumber: ourRouting, UserId: idemp.LocallyGeneratedKey},
+					},
+				}
+				body, _ := json.Marshal(interbankMsg)
+				req, _ := http.NewRequest("POST", os.Getenv("BANKING_SERVICE_URL")+"/interbank/internal", bytes.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+					log.Warnf("Neuspešno plaćanje premije: %v", err)
+				}
+			}
+		}
+	}
+
 	contract := types.OptionContract{
 		OTCTradeID:          trade.ID,
-		RemoteContractID:    &contractID,
+		RemoteContractID:    &negID,
+		UID:                 negID,
 		RemoteBuyerID:       trade.RemoteBuyerID,
 		RemoteSellerID:      trade.RemoteSellerID,
 		Quantity:            trade.Quantity,
@@ -1523,33 +1737,24 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 		})
 	}
 
-	ourRouting := 111
 	resp := struct {
-		ID             dto.ForeignBankId    `json:"id"`
+		NegotiationID  dto.ForeignBankId    `json:"negotiationId"`
 		Stock          dto.StockDescription `json:"stock"`
 		PricePerUnit   dto.MonetaryValue    `json:"pricePerUnit"`
 		SettlementDate string               `json:"settlementDate"`
 		Amount         int                  `json:"amount"`
-		NegotiationID  dto.ForeignBankId    `json:"negotiationId"`
 	}{
-		ID: dto.ForeignBankId{
+		NegotiationID: dto.ForeignBankId{
 			RoutingNumber: ourRouting,
-			ID:            contractID,
+			ID:            negID,
 		},
 		Stock:          dto.StockDescription{Ticker: trade.Ticker},
 		PricePerUnit:   dto.MonetaryValue{Currency: "USD", Amount: trade.PricePerUnit},
 		SettlementDate: trade.SettlementAt.Format(time.RFC3339),
 		Amount:         trade.Quantity,
-		NegotiationID: dto.ForeignBankId{
-			RoutingNumber: 111,
-			ID:            *trade.RemoteNegotiationID,
-		},
 	}
 
-	return ctx.JSON(fiber.Map{
-		"success": true,
-		"data":    resp,
-	})
+	return ctx.JSON(resp)
 }
 
 type interbankRaw struct {
@@ -1594,15 +1799,6 @@ func (c *OTCTradeController) handleNewTX(
 	key dto.IdempotenceKeyDTO,
 	tx dto.InterbankTransactionDTO,
 ) dto.VoteDTO {
-	//if len(tx.Postings) != 2 {
-	//	return dto.VoteDTO{
-	//		Vote: "NO",
-	//		Reasons: []dto.VoteReasonDTO{{
-	//			Reason:  "UNBALANCED_TX",
-	//			Posting: nil,
-	//		}},
-	//	}
-	//}
 
 	var sellerPosting *dto.PostingDTO
 	for i := range tx.Postings {
@@ -1760,8 +1956,8 @@ func InitOTCTradeRoutes(app *fiber.App) {
 	otc.Put("/offer/:id/accept", middlewares.RequirePermission("user.customer.otc_trade"), otcController.AcceptOTCTrade)
 	otc.Put("/offer/:id/reject", middlewares.RequirePermission("user.customer.otc_trade"), otcController.RejectOTCTrade)
 	otc.Put("/option/:id/execute", middlewares.RequirePermission("user.customer.otc_trade"), otcController.ExecuteOptionContract)
-	otc.Get("/offer/active", otcController.GetActiveOffers)
-	otc.Get("/option/contracts", otcController.GetUserOptionContracts)
+	otc.Get("/offer/active", middlewares.RequirePermission("user.customer.otc_trade"), otcController.GetActiveOffers)
+	otc.Get("/option/contracts", middlewares.RequirePermission("user.customer.otc_trade"), otcController.GetUserOptionContracts)
 
 	app.Get("/negotiations/:routingNumber/:id", otcController.GetInterbankNegotiation)
 	app.Post("/negotiations", middlewares.RequireInterbankApiKey, otcController.CreateInterbankNegotiation)

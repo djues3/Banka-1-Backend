@@ -118,12 +118,12 @@ type StockDescriptionDTO struct {
 }
 
 type OptionDescriptionDTO struct {
-	ID             ForeignBankIdDTO    `json:"id"`
+	NegotiationID  ForeignBankIdDTO    `json:"negotiationId"`
 	Stock          StockDescriptionDTO `json:"stock"`
 	PricePerUnit   MonetaryValueDTO    `json:"pricePerUnit"`
 	SettlementDate string              `json:"settlementDate"`
 	Amount         int                 `json:"amount"`
-	NegotiationID  *ForeignBankIdDTO   `json:"negotiationId,omitempty"`
+	//NegotiationID  *ForeignBankIdDTO   `json:"negotiationId,omitempty"`
 }
 
 type MonetaryValueDTO struct {

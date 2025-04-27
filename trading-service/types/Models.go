@@ -176,8 +176,6 @@ type InterbankNegotiation struct {
 	UpdatedAt              int64     `gorm:"autoUpdateTime"`
 }
 
-// models/interbank_txn_record.go
-
 type InterbankTxnRecord struct {
 	ID            uint     `gorm:"primaryKey"`
 	RoutingNumber int      `gorm:"not null;index"`
