@@ -164,19 +164,20 @@ func (c *OTCTradeController) CreateOTCTrade(ctx *fiber.Ctx) error {
 		return ctx.Status(500).JSON(types.Response{false, "", "Neuspešno parsiranje odgovora Banke 4"})
 	}
 
-	modifiedBy := fmt.Sprintf("%d%s", myRouting, localUserIDStr)
-
+	//modifiedBy := fmt.Sprintf("%d%s", myRouting, localUserIDStr)
+	seller := fmt.Sprintf("%d%s", 444, ibReq.SellerID)
+	buyer := fmt.Sprintf("%d%s", 111, localUserIDStr)
 	trade := types.OTCTrade{
 		RemoteRoutingNumber: &fbid.RoutingNumber,
 		RemoteNegotiationID: &fbid.ID,
-		RemoteSellerID:      &ibReq.SellerID,
-		RemoteBuyerID:       &localUserIDStr,
+		RemoteSellerID:      &seller,
+		RemoteBuyerID:       &buyer,
 		Ticker:              ibReq.Ticker,
 		Quantity:            ibReq.Quantity,
 		PricePerUnit:        ibReq.PricePerUnit,
 		Premium:             ibReq.Premium,
 		SettlementAt:        settlementDate,
-		ModifiedBy:          modifiedBy,
+		ModifiedBy:          localUserIDStr,
 		Status:              "pending",
 	}
 	if err := db.DB.Create(&trade).Error; err != nil {
@@ -252,27 +253,50 @@ func (c *OTCTradeController) CounterOfferOTCTrade(ctx *fiber.Ctx) error {
 	}
 
 	const myRouting = 111
+	const theirRouting = 444
 
 	var buyerFB, sellerFB dto.ForeignBankId
-	if trade.RemoteBuyerID != nil && *trade.RemoteBuyerID == fmt.Sprintf("%d%s", myRouting, localUserIDStr) {
-		buyerFB = dto.ForeignBankId{RoutingNumber: myRouting, ID: localUserIDStr}
-		sellerFB = dto.ForeignBankId{RoutingNumber: *trade.RemoteRoutingNumber, ID: *trade.RemoteSellerID}
-	} else if trade.RemoteSellerID != nil && *trade.RemoteSellerID == fmt.Sprintf("%d%s", myRouting, localUserIDStr) {
-		buyerFB = dto.ForeignBankId{RoutingNumber: *trade.RemoteRoutingNumber, ID: *trade.RemoteBuyerID}
-		sellerFB = dto.ForeignBankId{RoutingNumber: myRouting, ID: localUserIDStr}
+
+	extractSuffix := func(full string, routing int) string {
+		prefix := fmt.Sprint(routing)
+		if strings.HasPrefix(full, prefix) {
+			return full[len(prefix):]
+		}
+		return full
+	}
+
+	if trade.RemoteBuyerID != nil && strings.HasPrefix(*trade.RemoteBuyerID, fmt.Sprint(myRouting)) {
+		localSuffix := (*trade.RemoteBuyerID)[len(fmt.Sprint(myRouting)):]
+		buyerFB = dto.ForeignBankId{
+			RoutingNumber: myRouting,
+			ID:            localSuffix,
+		}
+
+		rawSeller := *trade.RemoteSellerID
+		sellerSuffix := extractSuffix(rawSeller, theirRouting)
+		sellerFB = dto.ForeignBankId{
+			RoutingNumber: theirRouting,
+			ID:            sellerSuffix,
+		}
+
+	} else if trade.RemoteSellerID != nil && strings.HasPrefix(*trade.RemoteSellerID, fmt.Sprint(myRouting)) {
+		localSuffix := (*trade.RemoteSellerID)[len(fmt.Sprint(myRouting)):]
+		sellerFB = dto.ForeignBankId{
+			RoutingNumber: myRouting,
+			ID:            localSuffix,
+		}
+
+		rawBuyer := *trade.RemoteBuyerID
+		buyerSuffix := extractSuffix(rawBuyer, theirRouting)
+		buyerFB = dto.ForeignBankId{
+			RoutingNumber: theirRouting,
+			ID:            buyerSuffix,
+		}
+
 	} else {
 		return ctx.Status(fiber.StatusForbidden).
 			JSON(types.Response{Success: false, Data: "", Error: "Niste učesnik ove međubankarske ponude"})
 	}
-	//STAVLJENO OVDE SAMO RADI TESTIRANJA,ODKOMENTARISATI ISPOD NA PRAVOM MESTU I OBRISATI OVO KADA SVE BUDE GOTOVO
-	//modifiedBy := fmt.Sprintf("%d%s", myRouting, localUserIDStr)
-	//trade.Quantity = req.Quantity
-	//trade.PricePerUnit = req.PricePerUnit
-	//trade.Premium = req.Premium
-	//trade.SettlementAt = settlementDate
-	//trade.LastModified = time.Now().Unix()
-	//trade.ModifiedBy = modifiedBy
-	//trade.Status = "pending"
 
 	if err := db.DB.Save(&trade).Error; err != nil {
 		return ctx.Status(500).
@@ -415,7 +439,7 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 
 		trade.Status = "accepted"
 		trade.LastModified = time.Now().Unix()
-		trade.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
+		trade.ModifiedBy = fmt.Sprintf("%d", userID)
 		if err := db.DB.Save(&trade).Error; err != nil {
 			return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
 				Success: false,
@@ -548,11 +572,7 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 	}
 
 	trade.Status = "accepted"
-	if trade.ModifiedBy == *trade.RemoteBuyerID {
-		trade.ModifiedBy = *trade.RemoteSellerID
-	} else {
-		trade.ModifiedBy = *trade.RemoteBuyerID
-	}
+	trade.ModifiedBy = fmt.Sprintf("%d", userID)
 	if err := db.DB.Save(&trade).Error; err != nil {
 		return ctx.Status(500).JSON(types.Response{false, "", "Greška pri ažuriranju ponude"})
 	}
@@ -568,7 +588,7 @@ func (c *OTCTradeController) AcceptOTCTrade(ctx *fiber.Ctx) error {
 		Premium:             trade.Premium,
 		SettlementAt:        trade.SettlementAt,
 		//TransactionID:       txKey,
-		Status:    "waitinforpremium",
+		Status:    "active",
 		CreatedAt: time.Now().Unix(),
 	}
 	if err := db.DB.Create(&contract).Error; err != nil {
@@ -1019,7 +1039,7 @@ func (c *OTCTradeController) RejectOTCTrade(ctx *fiber.Ctx) error {
 	if trade.RemoteNegotiationID == nil {
 		trade.Status = "rejected"
 		trade.LastModified = time.Now().Unix()
-		trade.ModifiedBy = fmt.Sprintf("%d%s", myRouting, localUserIDStr)
+		trade.ModifiedBy = fmt.Sprintf("%s", localUserIDStr)
 
 		if err := db.DB.Save(&trade).Error; err != nil {
 			return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
@@ -1068,7 +1088,7 @@ func (c *OTCTradeController) RejectOTCTrade(ctx *fiber.Ctx) error {
 	}
 	trade.Status = "rejected"
 	trade.LastModified = time.Now().Unix()
-	trade.ModifiedBy = fmt.Sprintf("%d%s", myRouting, localUserIDStr)
+	trade.ModifiedBy = fmt.Sprintf("%d", localUserID)
 
 	if err := db.DB.Save(&trade).Error; err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
@@ -1148,12 +1168,15 @@ type UnifiedPublicPortfolio struct {
 }
 
 func fetchForeignPublicStocks() ([]UnifiedPublicPortfolio, error) {
-	foreignURL := os.Getenv("BANK4_PUBLIC_STOCK_URL")
-	req, err := http.NewRequest("GET", foreignURL, nil)
+	baseURL := os.Getenv("BANK4_BASE_URL")
+	url := fmt.Sprintf("%s/public-stock", baseURL)
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("Greška pri kreiranju zahteva ka banci 4: %w", err)
 	}
 	req.Header.Set("X-Api-Key", os.Getenv("BANK4_API_KEY"))
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("Greška prilikom slanja zahteva ka banci 4: %w", err)
@@ -1272,28 +1295,71 @@ func (c *OTCTradeController) GetInterbankNegotiation(ctx *fiber.Ctx) error {
 		})
 	}
 
-	var buyerFB, sellerFB dto.ForeignBankId
 	const myRouting = 111
+	const theirRouting = 444
 
-	if t.LocalBuyerID != nil && t.LocalSellerID != nil {
-		buyerFB = dto.ForeignBankId{RoutingNumber: myRouting, ID: fmt.Sprint(*t.LocalBuyerID)}
-		sellerFB = dto.ForeignBankId{RoutingNumber: myRouting, ID: fmt.Sprint(*t.LocalSellerID)}
-	} else {
-		if t.RemoteRoutingNumber == nil || t.RemoteBuyerID == nil || t.RemoteSellerID == nil {
-			return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
-				Success: false,
-				Error:   "Nepotpuni podaci za međubankarsku ponudu",
-			})
-		}
-		buyerFB = dto.ForeignBankId{RoutingNumber: *t.RemoteRoutingNumber, ID: *t.RemoteBuyerID}
-		sellerFB = dto.ForeignBankId{RoutingNumber: *t.RemoteRoutingNumber, ID: *t.RemoteSellerID}
+	if t.RemoteBuyerID == nil || t.RemoteSellerID == nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+			Success: false,
+			Error:   "Nepotpuni podaci za međubankarsku ponudu",
+		})
+	}
+	// buyerFB:
+	buyerRaw := *t.RemoteBuyerID
+	if len(buyerRaw) < 3 {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+			Success: false,
+			Error:   "Nevalidan RemoteBuyerID",
+		})
+	}
+	buyerRouting, err := strconv.Atoi(buyerRaw[:3])
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+			Success: false,
+			Error:   "Nevalidan routing u RemoteBuyerID",
+		})
+	}
+	buyerIDStr := buyerRaw[3:]
+	buyerFB := dto.ForeignBankId{
+		RoutingNumber: buyerRouting,
+		ID:            buyerIDStr,
+	}
+
+	sellerRaw := *t.RemoteSellerID
+	if len(sellerRaw) < 3 {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+			Success: false,
+			Error:   "Nevalidan RemoteSellerID",
+		})
+	}
+	sellerRouting, err := strconv.Atoi(sellerRaw[:3])
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+			Success: false,
+			Error:   "Nevalidan routing u RemoteSellerID",
+		})
+	}
+	sellerIDStr := sellerRaw[3:]
+	sellerFB := dto.ForeignBankId{
+		RoutingNumber: sellerRouting,
+		ID:            sellerIDStr,
 	}
 
 	lmb := t.ModifiedBy
-	lmbRouting, _ := strconv.Atoi(lmb[:3])
+	if len(lmb) < 3 {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
+			Success: false,
+			Error:   "Nevalidan ModifiedBy",
+		})
+	}
+	lmRouting, err := strconv.Atoi(lmb[:3])
+	if err != nil {
+		lmRouting = myRouting
+	}
+	lmID := lmb[3:]
 	lastMod := dto.ForeignBankId{
-		RoutingNumber: lmbRouting,
-		ID:            lmb[3:],
+		RoutingNumber: lmRouting,
+		ID:            lmID,
 	}
 
 	nt := dto.OtcNegotiation{
@@ -1308,13 +1374,9 @@ func (c *OTCTradeController) GetInterbankNegotiation(ctx *fiber.Ctx) error {
 		IsOngoing:      t.Status == "pending",
 	}
 
-	return ctx.JSON(types.Response{
-		Success: true,
-		Data:    nt,
-	})
+	return ctx.JSON(nt)
 }
 
-// FUNKCIJE ZA RUTE KOJE BANKA 4 SALJE KA NAMA
 func (c *OTCTradeController) CreateInterbankNegotiation(ctx *fiber.Ctx) error {
 	//DODATI PROVERU DA LI POSTOJI PORTFOLIO SA TIM VLASNIKOMOM I TIM TICKEROM
 	var off dto.InterbankOtcOfferDTO
@@ -1656,7 +1718,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 						UserId:        remoteSuffix,
 					},
 				},
-				Amount: trade.Premium,
+				Amount: -trade.Premium,
 				Asset: dto.AssetDTO{
 					Type:  "MONAS",
 					Asset: toRaw(dto.MonetaryAssetDTO{Currency: "USD"}),
@@ -1712,7 +1774,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 			Error:   "Greška pri slanju interbank poruke",
 		})
 	}
-	// mozda na drugom mestu...
+
 	trade.Status = "accepted"
 	if err := db.DB.Save(&trade).Error; err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1733,7 +1795,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 		SettlementAt:        trade.SettlementAt,
 		RemoteNegotiationID: trade.RemoteNegotiationID,
 		TransactionID:       &idemp.LocallyGeneratedKey,
-		Status:              "waitinforpremium",
+		Status:              "active",
 		CreatedAt:           time.Now().Unix(),
 	}
 	if err := db.DB.Create(&contract).Error; err != nil {
@@ -1760,7 +1822,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 		Amount:         trade.Quantity,
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(data)
+	return ctx.JSON(data)
 }
 
 type interbankRaw struct {
@@ -1977,7 +2039,7 @@ func InitOTCTradeRoutes(app *fiber.App) {
 	otc.Get("/offer/active", middlewares.RequirePermission("user.customer.otc_trade"), otcController.GetActiveOffers)
 	otc.Get("/option/contracts", middlewares.RequirePermission("user.customer.otc_trade"), otcController.GetUserOptionContracts)
 
-	app.Get("/negotiations/:routingNumber/:id", otcController.GetInterbankNegotiation)
+	app.Get("/negotiations/:routingNumber/:id", middlewares.RequireInterbankApiKey, otcController.GetInterbankNegotiation)
 	app.Post("/negotiations", middlewares.RequireInterbankApiKey, otcController.CreateInterbankNegotiation)
 	app.Put("/negotiations/:routingNumber/:id", middlewares.RequireInterbankApiKey, otcController.CounterInterbankNegotiation)
 	app.Delete("/negotiations/:routingNumber/:id", middlewares.RequireInterbankApiKey, otcController.CloseInterbankNegotiation)
