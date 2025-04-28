@@ -2,11 +2,13 @@ package com.banka1.banking.services;
 
 import com.banka1.banking.config.InterbankConfig;
 import com.banka1.banking.dto.CreateEventDTO;
+import com.banka1.banking.dto.MoneyTransferDTO;
 import com.banka1.banking.dto.interbank.InterbankMessageDTO;
 import com.banka1.banking.dto.interbank.InterbankMessageType;
 import com.banka1.banking.dto.interbank.VoteDTO;
 import com.banka1.banking.dto.interbank.VoteReasonDTO;
 import com.banka1.banking.dto.interbank.committx.CommitTransactionDTO;
+import com.banka1.banking.dto.interbank.internal.PremiumPaymentDTO;
 import com.banka1.banking.dto.interbank.newtx.ForeignBankIdDTO;
 import com.banka1.banking.dto.interbank.newtx.InterbankTransactionDTO;
 import com.banka1.banking.dto.interbank.newtx.PostingDTO;
@@ -28,6 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.net.http.HttpResponse;
@@ -281,6 +284,20 @@ public class InterbankService implements InterbankOperationService {
         System.out.println("Handling COMMIT_TX message: " + event.getPayload());
         InterbankTransactionDTO originalMessage = originalNewTxMessage.getMessage();
 
+        if (messageDto.getMessage().getTransactionId().getId().startsWith("premium-") || messageDto.getMessage().getTransactionId().getId().startsWith("tx-")) {
+            forwardCommitOriginal(messageDto);
+        }
+
+        if (originalMessage.getPostings().size() == 2) {
+            handle2PostingCommit(messageDto, originalMessage, originalNewTxMessage);
+        }
+
+        if (originalMessage.getPostings().size() == 4) {
+            handle4PostingCommit(messageDto, originalMessage, originalNewTxMessage);
+        }
+    }
+
+    public void handle2PostingCommit(InterbankMessageDTO<CommitTransactionDTO> messageDto, InterbankTransactionDTO originalMessage, InterbankMessageDTO<InterbankTransactionDTO> originalNewTxMessage) {
         Account localAccount = null;
         Currency localCurrency = null;
         double amount = 0.0;
@@ -342,6 +359,84 @@ public class InterbankService implements InterbankOperationService {
             throw new IllegalArgumentException("Failed to create transfer");
         }
     }
+
+    public void handle4PostingCommit(InterbankMessageDTO<CommitTransactionDTO> messageDto, InterbankTransactionDTO originalMessage, InterbankMessageDTO<InterbankTransactionDTO> originalNewTxMessage) {
+//        try {
+//            String jsonString = objectMapper.writeValueAsString(originalMessage.getPostings());
+//
+//            HttpResponse<String> response = requestService.send(
+//                    new RequestBuilder()
+//                            .method("POST")
+//                            .url(config.getTradingServiceUrl() + "/validate-postings")
+//                            .body(jsonString)
+//                            .addHeader("Content-Type", "application/json")
+//            );
+//
+//            if (response.statusCode() != 200) {
+//                throw new RuntimeException("Trading servis nije prihvatio postings. Status: " + response.statusCode());
+//            }
+//        } catch (Exception e) {
+//            throw new RuntimeException("Greška prilikom komunikacije sa Trading servisom: " + e.getMessage(), e);
+//        }
+
+        boolean foundLocalMonas = false;
+
+        for (PostingDTO posting : originalMessage.getPostings()) {
+            if (!(posting.getAsset() instanceof MonetaryAssetDTO asset)) {
+                continue;
+            }
+
+            TxAccountDTO account = posting.getAccount();
+            boolean isLocal = false;
+            String localAccountNumber = null;
+
+            if ("ACCOUNT".equals(account.getType())) {
+                if (account.getNum() != null && account.getNum().startsWith(config.getRoutingNumber())) {
+                    isLocal = true;
+                    localAccountNumber = account.getNum();
+                }
+            } else if ("PERSON".equals(account.getType())) {
+                if (account.getId() != null && config.getRoutingNumber().equals(account.getId().getRoutingNumber())) {
+                    isLocal = true;
+                    localAccountNumber = account.getId().getId();
+                }
+            }
+
+            if (isLocal) {
+                foundLocalMonas = true;
+
+                Optional<Account> localAccountOpt = accountRepository.findByAccountNumber(localAccountNumber);
+                if (localAccountOpt.isEmpty()) {
+                    throw new IllegalArgumentException("Local account not found: " + localAccountNumber);
+                }
+                Account localAccount = localAccountOpt.get();
+
+                CurrencyType currencyType = CurrencyType.fromString(asset.getAsset().getCurrency());
+                Optional<Currency> currencyOpt = currencyRepository.findByCode(currencyType);
+                if (currencyOpt.isEmpty()) {
+                    throw new IllegalArgumentException("Currency not found: " + currencyType);
+                }
+                Currency localCurrency = currencyOpt.get();
+
+                Transfer transfer = transferService.receiveForeignBankTransfer(
+                        localAccount.getAccountNumber(),
+                        posting.getAmount(),
+                        originalMessage.getMessage(),
+                        "Banka 4",
+                        localCurrency
+                );
+
+                if (transfer == null) {
+                    throw new RuntimeException("Failed to create transfer for account: " + localAccountNumber);
+                }
+            }
+        }
+
+        if (!foundLocalMonas) {
+            System.out.println("Found no local MONAS postings");
+        }
+    }
+
 
 
     public VoteDTO handleNewTXRequest(InterbankMessageDTO<InterbankTransactionDTO> messageDto) {
@@ -594,6 +689,79 @@ public class InterbankService implements InterbankOperationService {
         } catch (Exception e) {
             throw new RuntimeException(
                     "Failed to forward message to trading service: " + e.getMessage());
+        }
+    }
+
+    private VoteDTO forwardCommitOriginal(InterbankMessageDTO<CommitTransactionDTO> messageDto) {
+        String jsonString;
+        try {
+            jsonString = objectMapper.writeValueAsString(messageDto);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to convert message to JSON: " + e.getMessage());
+        }
+
+        try {
+            HttpResponse<String> response =
+                    requestService.send(
+                            new RequestBuilder()
+                                    .method("POST")
+                                    .url(config.getTradingServiceUrl())
+                                    .body(jsonString)
+                                    .addHeader("Content-Type", "application/json"));
+
+            VoteDTO voteDTO = objectMapper.readValue(response.body(), VoteDTO.class);
+            if (voteDTO == null) {
+                throw new RuntimeException("Failed to parse response from trading service");
+            }
+
+            if (voteDTO.getVote() == null || voteDTO.getVote().isEmpty()) {
+                throw new RuntimeException("Invalid response from trading service");
+            }
+
+            return voteDTO;
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to forward message to trading service: " + e.getMessage());
+        }
+    }
+
+    private void internal(InterbankMessageDTO<?> message) {
+        // this function receives message from our other service and should be just forwarded to the foreign bank
+
+        // check if idempotence key already exists
+        if (eventService.existsByIdempotenceKey(message.getIdempotenceKey(), message.getMessageType())) {
+            return;
+        }
+
+        // forward the message to the foreign bank
+        String jsonString;
+        try {
+            jsonString = objectMapper.writeValueAsString(message);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to convert message to JSON: " + e.getMessage());
+        }
+
+        try {
+            HttpResponse<String> response =
+                    requestService.send(
+                            new RequestBuilder()
+                                    .method("POST")
+                                    .url(config.getInterbankTargetUrl())
+                                    .body(jsonString)
+                                    .addHeader("Content-Type", "application/json"));
+
+            VoteDTO voteDTO = objectMapper.readValue(response.body(), VoteDTO.class);
+            if (voteDTO == null) {
+                throw new RuntimeException("Failed to parse response from foreign bank");
+            }
+
+            if (voteDTO.getVote() == null || voteDTO.getVote().isEmpty()) {
+                throw new RuntimeException("Invalid response from foreign bank");
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to forward message to foreign bank: " + e.getMessage());
         }
     }
 }
