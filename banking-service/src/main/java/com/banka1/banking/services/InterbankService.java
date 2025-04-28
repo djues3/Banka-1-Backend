@@ -725,7 +725,7 @@ public class InterbankService implements InterbankOperationService {
         }
     }
 
-    public void internal(InterbankMessageDTO<?> message) {
+    public void internal(InterbankMessageDTO<InterbankTransactionDTO> message) {
         // this function receives message from our other service and should be just forwarded to the foreign bank
 
         // check if idempotence key already exists
@@ -733,35 +733,10 @@ public class InterbankService implements InterbankOperationService {
             return;
         }
 
-        // forward the message to the foreign bank
-        String jsonString;
-        try {
-            jsonString = objectMapper.writeValueAsString(message);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to convert message to JSON: " + e.getMessage());
-        }
-
-        try {
-            HttpResponse<String> response =
-                    requestService.send(
-                            new RequestBuilder()
-                                    .method("POST")
-                                    .url(config.getInterbankTargetUrl())
-                                    .body(jsonString)
-                                    .addHeader("Content-Type", "application/json"));
-
-            VoteDTO voteDTO = objectMapper.readValue(response.body(), VoteDTO.class);
-            if (voteDTO == null) {
-                throw new RuntimeException("Failed to parse response from foreign bank");
-            }
-
-            if (voteDTO.getVote() == null || voteDTO.getVote().isEmpty()) {
-                throw new RuntimeException("Invalid response from foreign bank");
-            }
-
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Failed to forward message to foreign bank: " + e.getMessage());
-        }
+       try {
+           sendInterbankMessage(message, config.getInterbankTargetUrl());
+       } catch (Exception e) {
+           throw new RuntimeException("Failed to send interbank message: " + e.getMessage());
+       }
     }
 }

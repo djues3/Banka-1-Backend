@@ -3,6 +3,7 @@ package com.banka1.banking.controllers;
 import com.banka1.banking.dto.interbank.InterbankMessageDTO;
 import com.banka1.banking.dto.interbank.VoteDTO;
 import com.banka1.banking.dto.interbank.internal.PremiumPaymentDTO;
+import com.banka1.banking.dto.interbank.newtx.InterbankTransactionDTO;
 import com.banka1.banking.services.InterbankService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -58,7 +59,7 @@ public class InterbankController {
                 request.getReader().lines().collect(Collectors.joining(System.lineSeparator()));
 
         ObjectMapper mapper = new ObjectMapper();
-        InterbankMessageDTO<?> message = mapper.readValue(rawPayload, InterbankMessageDTO.class);
+        InterbankMessageDTO<InterbankTransactionDTO> message = mapper.readValue(rawPayload, InterbankMessageDTO.class);
         try {
 
             interbankService.internal(message);
