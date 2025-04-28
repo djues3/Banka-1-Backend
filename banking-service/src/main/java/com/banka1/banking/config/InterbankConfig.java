@@ -7,21 +7,21 @@ import org.springframework.stereotype.Component;
 @Component
 @Getter
 public class InterbankConfig {
-    @Value("${ROUTING_NUMBER}")
+    @Value("${interbank.routing.number}")
     private String routingNumber;
 
-    @Value("${FOREIGN_BANK_ROUTING_NUMBER}")
+    @Value("${foreign.bank.routing.number}")
     private String foreignBankRoutingNumber;
 
-    @Value("${INTERBANK_TARGET_URL}")
+    @Value("${interbank.target.url}")
     private String interbankTargetUrl;
 
-    @Value("${API_KEY}")
+    @Value("${api.key}")
     private String apiKey;
 
-    @Value("${FOREIGN_BANK_API_KEY}")
+    @Value("${foreign.bank.api.key}")
     private String foreignBankApiKey;
 
-    @Value("${TRADING_SERVICE_URL}")
+    @Value("${trading.service.url}")
     private String tradingServiceUrl;
 }
