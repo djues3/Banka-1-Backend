@@ -725,7 +725,7 @@ public class InterbankService implements InterbankOperationService {
         }
     }
 
-    private void internal(InterbankMessageDTO<?> message) {
+    public void internal(InterbankMessageDTO<?> message) {
         // this function receives message from our other service and should be just forwarded to the foreign bank
 
         // check if idempotence key already exists
