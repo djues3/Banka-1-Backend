@@ -636,7 +636,7 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 		strike := contract.StrikePrice
 
 		buyerID := int64(userID)
-		userIDStr := strconv.FormatUint(uint64(userID), 10)
+		//userIDStr := strconv.FormatUint(uint64(userID), 10)
 		buyerAccounts, err := broker.GetAccountsForUser(buyerID)
 		if err != nil {
 			return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
@@ -690,8 +690,8 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 			Account: dto.TxAccountDTO{
 				Type: "OPTION",
 				Id: &dto.ForeignBankIdDTO{
-					RoutingNumber: ourRouting,
-					UserId:        sellerUserId,
+					RoutingNumber: theirRouting,
+					UserId:        *contract.RemoteNegotiationID,
 				},
 			},
 			Amount: float64(-qty),
@@ -706,7 +706,7 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 				Type: "PERSON",
 				Id: &dto.ForeignBankIdDTO{
 					RoutingNumber: interRouting,
-					UserId:        userIDStr,
+					UserId:        sellerUserId,
 				},
 			},
 			Amount: float64(qty),
@@ -720,8 +720,8 @@ func (c *OTCTradeController) ExecuteOptionContract(ctx *fiber.Ctx) error {
 			Account: dto.TxAccountDTO{
 				Type: "OPTION",
 				Id: &dto.ForeignBankIdDTO{
-					RoutingNumber: interRouting,
-					UserId:        sellerUserId,
+					RoutingNumber: theirRouting,
+					UserId:        *contract.RemoteNegotiationID,
 				},
 			},
 			Amount: strike * float64(qty),
