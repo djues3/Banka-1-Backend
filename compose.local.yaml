@@ -120,10 +120,10 @@ services:
       - SPRING_OUTPUT_ANSI_ENABLED=always
       - ROUTING_NUMBER=111
       - FOREIGN_BANK_ROUTING_NUMBER=444
-      - INTERBANK_TARGET_URL=http://banking-service-b:8084/interbank
+      - INTERBANK_TARGET_URL=https://banka-4.si.raf.edu.rs/interbank
       - API_KEY=kebakraba
       - FOREIGN_BANK_API_KEY=jos_nema
-      - TRADING_SERVICE_URL=http://trading-service:8083/trading
+      - TRADING_SERVICE_URL=http://trading-service:3000/interbank/internal
     healthcheck:
       test: [ "CMD", "/workspace/health-check" ]
       interval: 10s
