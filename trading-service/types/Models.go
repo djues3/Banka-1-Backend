@@ -126,6 +126,8 @@ type OptionContract struct {
 	Premium             float64    `gorm:"not null" json:"premium"`
 	UID                 string     `gorm:"type:varchar(255);index" json:"uid,omitempty"`
 	SettlementAt        time.Time  `gorm:"not null" json:"settlementAt"`
+	TransactionID       *string    `gorm:"" json:"transactionId,omitempty"`
+	IsPremiumPaid       *bool      `gorm:"default:false" json:"isPremiumPaid,omitempty"`
 	Status              string     `gorm:"type:text;default:'active'" json:"status"`
 	IsExercised         bool       `gorm:"default:false" json:"isExercised"`
 	CreatedAt           int64      `gorm:"autoCreateTime" json:"createdAt"`
@@ -174,6 +176,18 @@ type InterbankNegotiation struct {
 	LocalBuyerUserID       *uint     `gorm:"default:null"`
 	CreatedAt              int64     `gorm:"autoCreateTime"`
 	UpdatedAt              int64     `gorm:"autoUpdateTime"`
+}
+
+type InterbankTxnRecord struct {
+	ID            uint     `gorm:"primaryKey"`
+	RoutingNumber int      `gorm:"not null;index"`
+	TransactionId string   `gorm:"not null;uniqueIndex:idx_txn"`
+	UserID        uint     `gorm:"not null"`
+	SecurityID    uint     `gorm:"not null"`
+	Quantity      int      `gorm:"not null"`
+	PurchasePrice *float64 `gorm:"not null"`
+	NeedsCredit   bool     `gorm:"not null;default:false"`
+	State         string   `gorm:"not null"`
 }
 
 type OTCSagaPhase int
