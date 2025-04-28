@@ -1560,7 +1560,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 					Type: "PERSON",
 					Id: &dto.ForeignBankIdDTO{
 						RoutingNumber: myRouting,
-						UserId:        fmt.Sprintf("%d", localSuffix),
+						UserId:        fmt.Sprintf("%d", localID),
 					},
 				},
 				Amount: 1,
@@ -1639,7 +1639,7 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 					Type: "PERSON",
 					Id: &dto.ForeignBankIdDTO{
 						RoutingNumber: theirRouting,
-						UserId:        fmt.Sprintf("%d", remoteSuffix),
+						UserId:        remoteSuffix,
 					},
 				},
 				Amount: 1,
