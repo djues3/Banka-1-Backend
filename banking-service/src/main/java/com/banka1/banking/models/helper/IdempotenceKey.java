@@ -20,7 +20,7 @@ import lombok.ToString;
 @ToString
 public class IdempotenceKey {
 
-    private String routingNumber;
+    private Integer routingNumber;
 
     @Column(length = 64)
     private String locallyGeneratedKey;

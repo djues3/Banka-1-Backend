@@ -1,5 +1,6 @@
 package com.banka1.banking.dto;
 
+import com.banka1.banking.dto.interbank.VoteDTO;
 import com.banka1.banking.models.Event;
 import com.banka1.banking.models.helper.DeliveryStatus;
 import lombok.Data;
@@ -16,7 +17,7 @@ public class CreateEventDeliveryDTO {
 
     private int httpStatus;
 
-    private String responseBody;
+    private VoteDTO responseBody;
 
     private long durationMs;
 }

@@ -13,8 +13,12 @@ import com.banka1.banking.models.helper.IdempotenceKey;
 import com.banka1.banking.models.interbank.EventDirection;
 import com.banka1.banking.repository.EventDeliveryRepository;
 import com.banka1.banking.repository.EventRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +34,7 @@ public class EventService {
     private final EventRepository eventRepository;
     private final EventDeliveryRepository eventDeliveryRepository;
     private final InterbankConfig config;
+    private final ObjectMapper mapper;
 
     public int attemptCount(Event event) {
         return event.getDeliveries().size();
@@ -49,6 +54,7 @@ public class EventService {
         }
 
         if (eventRepository.existsByIdempotenceKeyAndMessageType(dto.getIdempotenceKey(), dto.getMessageType())) {
+            log.info("Event already exists with idempotence key: " + dto.getIdempotenceKey());
             return eventRepository
                     .findByIdempotenceKey(dto.getIdempotenceKey())
                     .orElseThrow(
@@ -71,7 +77,7 @@ public class EventService {
                 event.setIdempotenceKey(dto.getIdempotenceKey());
             } else {
                 IdempotenceKey idempotenceKey = new IdempotenceKey();
-                idempotenceKey.setRoutingNumber(config.getRoutingNumber());
+                idempotenceKey.setRoutingNumber(Integer.valueOf(config.getRoutingNumber()));
                 idempotenceKey.setLocallyGeneratedKey(UUID.randomUUID().toString());
                 event.setIdempotenceKey(idempotenceKey);
             }
@@ -106,9 +112,13 @@ public class EventService {
         eventDelivery.setStatus(createEventDeliveryDTO.getStatus());
         eventDelivery.setHttpStatus(createEventDeliveryDTO.getHttpStatus());
         eventDelivery.setDurationMs(createEventDeliveryDTO.getDurationMs());
-        eventDelivery.setResponseBody(createEventDeliveryDTO.getResponseBody());
+	    try {
+		    eventDelivery.setResponseBody(mapper.writeValueAsString(createEventDeliveryDTO.getResponseBody()));
+	    } catch (JsonProcessingException e) {
+		    return null;
+	    }
 
-        eventDelivery.setSentAt(Instant.now());
+	    eventDelivery.setSentAt(Instant.now());
 
         return eventDeliveryRepository.save(eventDelivery);
     }
@@ -127,11 +137,29 @@ public class EventService {
 
     public Event findEventByTransactionId(ForeignBankIdDTO txId) {
         return eventRepository
-                .findByTransactionIdInPayload(txId.getRoutingNumber(), txId.getId())
+                .findByTransactionIdInPayload(String.valueOf(txId.getRoutingNumber()), txId.getId())
                 .orElseThrow(() -> new RuntimeException("Event not found: " + txId));
     }
 
     public boolean existsByIdempotenceKey(IdempotenceKey idempotenceKey, InterbankMessageType messageType) {
         return eventRepository.existsByIdempotenceKeyAndMessageType(idempotenceKey, messageType);
+    }
+
+    public boolean shouldReplay(IdempotenceKey idempotenceKey, InterbankMessageType messageType) {
+        var eventOpt = eventRepository.findByIdempotenceKeyAndMessageTypeAndStatus(
+                idempotenceKey,
+                messageType,
+                DeliveryStatus.SUCCESS);
+        if (eventOpt.isEmpty()) {
+            return false;
+        }
+        var event = eventOpt.get();
+        // Since events get saved before the request reaches this point in the interceptor,
+        // there needs to be a way to ignore them.
+        // This is that way.
+	    return event
+			    .getCreatedAt()
+			    .plusMillis(100)
+			    .isBefore(Instant.now());
     }
 }

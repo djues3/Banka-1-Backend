@@ -182,12 +182,13 @@ type InterbankTxnRecord struct {
 	ID            uint     `gorm:"primaryKey"`
 	RoutingNumber int      `gorm:"not null;index"`
 	TransactionId string   `gorm:"not null;uniqueIndex:idx_txn"`
-	UserID        uint     `gorm:"not null"`
-	SecurityID    uint     `gorm:"not null"`
+	UserID        uint     `gorm:""`
+	SecurityID    uint     `gorm:""`
 	Quantity      int      `gorm:"not null"`
 	PurchasePrice *float64 `gorm:"not null"`
 	NeedsCredit   bool     `gorm:"not null;default:false"`
 	State         string   `gorm:"not null"`
+	ContractId    *uint    `gorm:"default:null"`
 }
 
 type OTCSagaPhase int

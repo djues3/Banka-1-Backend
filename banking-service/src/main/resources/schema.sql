@@ -337,7 +337,7 @@ create table event (
                        created_at timestamp,
                        unique_key varchar(255) unique,
                        status varchar(50),
-                       routing_number varchar(50),
+                       routing_number bigint,
                        direction varchar(50),
                        locally_generated_key varchar(64)
 );

@@ -95,6 +95,7 @@ func migrate(db *gorm.DB) {
 		&types.ListingHistory{},
 		&types.Transaction{},
 		&types.OTCSagaState{},
+		&types.InterbankTxnRecord{},
 	)
 }
 
