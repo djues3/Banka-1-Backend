@@ -1088,11 +1088,6 @@ public class TransferService {
         if (transfer.getStatus() != TransferStatus.RESERVED) {
             throw new RuntimeException("Transfer is not in reserved state");
         }
-
-        if (transfer.getStatus() == TransferStatus.COMPLETED) {
-            throw new RuntimeException("Transfer has already been processed");
-        }
-
         try {
 
             // create transaction for the transfer

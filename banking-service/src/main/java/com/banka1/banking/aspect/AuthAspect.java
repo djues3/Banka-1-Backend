@@ -153,10 +153,8 @@ public class AuthAspect {
     public Object authorizeAction(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         Method method = methodSignature.getMethod();
-        System.out.println("Autorizing 1");
 
         return doAuth(methodSignature, joinPoint, (claims) -> {
-            System.out.println("Autorizing 2");
             Authorization authorization = method.getAnnotation(Authorization.class);
 
             if(!authorization.customerOnlyOperation()) {
@@ -166,21 +164,17 @@ public class AuthAspect {
                 }
             }
 
-            System.out.println("Autorizing 3");
 
             if(!authorization.employeeOnlyOperation()) {
-                System.out.println("Autorizing 3.1");
                 return joinPoint.proceed();
             }
 
-            System.out.println("Autorizing 4");
 
             // ako je admin
             if(!authorization.disallowAdminFallback() && Objects.equals(claims.get("isAdmin", Boolean.class), true)) {
                 return joinPoint.proceed();
             }
 
-            System.out.println("Autorizing 5");
 
             return ResponseTemplate.create(ResponseEntity.status(HttpStatus.FORBIDDEN), false, null, ResponseMessage.FORBIDDEN.toString());
         });

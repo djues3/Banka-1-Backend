@@ -84,16 +84,16 @@ public class EventExecutorService {
 
         // add body to request
 
-        String responseBody = null;
-        int httpStatus = 0;
+        VoteDTO responseBody = null;
+        int httpStatus;
         DeliveryStatus status;
 
         try {
-            log.info("Sending request to: {}", event.getUrl());
-            ResponseEntity<String> response = getTemplate().postForEntity(event.getUrl(), entity, String.class);
+            log.info("Sending request to: {}", config.getInterbankTargetUrl());
+            ResponseEntity<VoteDTO> response = getTemplate().postForEntity(config.getInterbankTargetUrl(), entity, VoteDTO.class);
             log.info("Response: {}", response.getBody());
             log.info("Response status code: {}", response.getStatusCode());
-            responseBody = response.getBody() != null ? new ObjectMapper().writeValueAsString(response.getBody()) : "";
+            responseBody = response.getBody();
 
             httpStatus = response.getStatusCode()
                                  .value();
@@ -104,7 +104,6 @@ public class EventExecutorService {
             log.info("Error sending message", ex);
             status = DeliveryStatus.FAILED;
             httpStatus = -1;
-            responseBody = ex.getMessage();
         }
 
         if (status == DeliveryStatus.FAILED && attempt < MAX_RETRIES) {
@@ -128,12 +127,9 @@ public class EventExecutorService {
     }
 
 
-    public void handleNewTxSuccess(Event event, String responseBody) {
-        log.info("Handling new transaction success for event: {}", event.getId());
+    public void handleNewTxSuccess(Event event, VoteDTO vote) {
         try {
             log.info("Handling new transaction success for event: {}", event.getId());
-            String actualJson = new ObjectMapper().readValue(responseBody, String.class);
-            VoteDTO vote = new ObjectMapper().readValue(actualJson, VoteDTO.class);
 
             if (vote.getVote().equalsIgnoreCase("yes")) {
                 interbankService.sendCommit(event);

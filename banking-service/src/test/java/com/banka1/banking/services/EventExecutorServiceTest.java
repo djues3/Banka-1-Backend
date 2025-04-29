@@ -68,7 +68,7 @@ public class EventExecutorServiceTest {
                 delivery.setEvent(dto.getEvent());
                 delivery.setStatus(dto.getStatus());
                 delivery.setHttpStatus(dto.getHttpStatus());
-                delivery.setResponseBody(dto.getResponseBody());
+                delivery.setResponseBody(String.valueOf(dto.getResponseBody()));
                 delivery.setDurationMs(dto.getDurationMs());
                 return delivery;
             });
@@ -88,7 +88,7 @@ public class EventExecutorServiceTest {
         String voteJson = new ObjectMapper().writeValueAsString(voteDTO);
         String wrappedJson = new ObjectMapper().writeValueAsString(voteJson);
 
-        eventExecutorService.handleNewTxSuccess(mockEvent, wrappedJson);
+        eventExecutorService.handleNewTxSuccess(mockEvent, voteDTO);
         verify(interbankService).sendCommit(mockEvent);
     }
 
@@ -100,7 +100,7 @@ public class EventExecutorServiceTest {
         String voteJson = new ObjectMapper().writeValueAsString(voteDTO);
         String wrappedJson = new ObjectMapper().writeValueAsString(voteJson);
 
-        eventExecutorService.handleNewTxSuccess(mockEvent, wrappedJson);
+        eventExecutorService.handleNewTxSuccess(mockEvent, voteDTO);
         verify(interbankService).sendRollback(mockEvent);
     }
     

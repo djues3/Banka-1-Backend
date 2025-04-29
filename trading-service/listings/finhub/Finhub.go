@@ -143,7 +143,6 @@ type NasdaqAPIResponse struct {
 
 func GetNasdaqAPIResponse(stockSymbol, subtype string, start, end time.Time) (NasdaqAPIResponse, error) {
 	url := fmt.Sprintf("https://api.nasdaq.com/api/quote/%s/historical?assetclass=%s&fromdate=%s&limit=99999&todate=%s", stockSymbol, "stocks", start.Format("2006-01-02"), end.Format("2006-01-02"))
-	fmt.Println("Fetching historical price data for", url)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return NasdaqAPIResponse{}, err

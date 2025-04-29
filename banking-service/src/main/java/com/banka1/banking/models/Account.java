@@ -5,16 +5,14 @@ import com.banka1.banking.models.helper.AccountSubtype;
 import com.banka1.banking.models.helper.AccountType;
 import com.banka1.banking.models.helper.CurrencyType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Entity
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class Account {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

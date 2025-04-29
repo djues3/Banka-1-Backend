@@ -95,7 +95,6 @@ func (sc *SecuritiesController) GetUserSecurities(c *fiber.Ctx) error {
 			Where("user_id = ? AND security_id = ?", p.UserID, p.SecurityID).
 			Scan(&lastMod).Error
 		if err != nil || lastMod == 0 {
-			log.Println("Error fetching lastModified:", err)
 			lastMod = p.CreatedAt // fallback
 		}
 

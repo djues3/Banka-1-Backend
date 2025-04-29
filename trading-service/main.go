@@ -110,14 +110,14 @@ func main() {
 func checkUncompletedOrders() {
 	var undoneOrders []types.Order
 
-	fmt.Println("Proveravanje neizvršenih naloga...")
+	//fmt.Println("Proveravanje neizvršenih naloga...")
 
 	db.DB.Where("status = 'approved' AND NOT is_done").Find(&undoneOrders)
-	fmt.Printf("Pronadjeno %v neizvršenih naloga\n", len(undoneOrders))
+	//fmt.Printf("Pronadjeno %v neizvršenih naloga\n", len(undoneOrders))
 	previousLength := -1
 
 	for len(undoneOrders) > 0 && previousLength != len(undoneOrders) {
-		fmt.Printf("Preostalo još %v neizvršenih naloga\n", len(undoneOrders))
+		//fmt.Printf("Preostalo još %v neizvršenih naloga\n", len(undoneOrders))
 		for _, order := range undoneOrders {
 			if !orders.IsSettlementDateValid(&order) {
 				fmt.Printf("Order %d automatski odbijen zbog isteka settlement datuma\n", order.ID)
