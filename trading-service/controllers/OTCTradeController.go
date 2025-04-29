@@ -1892,7 +1892,7 @@ func (c *OTCTradeController) HandleInterbankTX(ctx *fiber.Ctx) error {
 					log.Errorf("Greška pri dohvatanju ugovora: %v", err)
 					log.Infof("NegotationId: %v", opt)
 					log.Infof("Asset type: %v", fmt.Sprintf("%s", p.Asset.Asset))
-					log.Infof("Postings: %v", fmt.Sprintf("%s", p))
+					log.Infof("Postings: %v", fmt.Sprintf("%v", p))
 					return ctx.Status(fiber.StatusInternalServerError).
 						JSON(fiber.Map{"error": "Ugovor nije pronađen za negotiationId=" + opt.NegotiationID.UserId})
 				}

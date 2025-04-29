@@ -999,7 +999,7 @@ public class TransferServiceTest {
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(transferRepository.save(any(Transfer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Transfer result = transferService.commitForeignBankTransfer();
+        Transfer result = transferService.commitForeignBankTransfer(key);
 
         assertEquals(TransferStatus.COMPLETED, result.getStatus());
         verify(transactionRepository).save(any(Transaction.class));
