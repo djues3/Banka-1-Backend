@@ -29,7 +29,7 @@ public class InterbankController {
 
     private final InterbankService interbankService;
 
-    @PostMapping
+    @PostMapping({"/", ""})
     public ResponseEntity<?> receiveWebhook(HttpServletRequest request) throws IOException {
         String rawPayload =
                 request.getReader().lines().collect(Collectors.joining(System.lineSeparator()));
@@ -52,7 +52,7 @@ public class InterbankController {
         }
     }
 
-    @PostMapping("/internal")
+    @PostMapping({"/internal", "/internal/"})
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public ResponseEntity<?> internal(HttpServletRequest request) throws IOException {
         String rawPayload =

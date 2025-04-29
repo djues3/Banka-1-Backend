@@ -1783,8 +1783,13 @@ func (c *OTCTradeController) AcceptInterbankNegotiation(ctx *fiber.Ctx) error {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Infof("Greška pri slanju interbank poruke: %v", err)
-		log.Infof("Response body: %s", resp.Body)
-		return ctx.Status(fiber.StatusBadGateway).JSON(types.Response{
+		slice, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Errorf("Couldn't read response body: %v", err)
+		} else {
+			log.Infof("Response body: %s", string(slice))
+		}
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.Response{
 			Success: false,
 			Error:   "Greška pri slanju interbank poruke",
 		})

@@ -661,7 +661,9 @@ public class InterbankService implements InterbankOperationService {
                                     .url(config.getTradingServiceUrl())
                                     .body(jsonString)
                                     .addHeader("Content-Type", "application/json"));
-            VoteDTO voteDTO = objectMapper.readValue(response.body(), VoteDTO.class);
+            String body = response.body();
+            log.info("NewTX response: {}", body);
+            VoteDTO voteDTO = objectMapper.readValue(body, VoteDTO.class);
             if (voteDTO == null) {
                 throw new RuntimeException("Failed to parse response from trading service");
             }
@@ -715,6 +717,7 @@ public class InterbankService implements InterbankOperationService {
     private VoteDTO forwardCommitOriginal(InterbankMessageDTO<CommitTransactionDTO> messageDto) {
         String jsonString;
         try {
+            log.info("About to forward commit to trading service: {}", messageDto);
             jsonString = objectMapper.writeValueAsString(messageDto);
         } catch (Exception e) {
             throw new RuntimeException("Failed to convert message to JSON: " + e.getMessage());
